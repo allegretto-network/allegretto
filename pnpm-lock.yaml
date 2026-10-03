@@ -274,15 +274,15 @@ importers:
 
   apps/api:
     dependencies:
-      '@hono/zod-openapi':
-        specifier: 'catalog:'
-        version: 1.6.3(hono@4.13.9)(zod@4.6.5)
       '@allegretto-network/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@allegretto-network/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@hono/zod-openapi':
+        specifier: 'catalog:'
+        version: 1.6.3(hono@4.13.9)(zod@4.6.5)
       graphql:
         specifier: 'catalog:'
         version: 17.0.2
@@ -402,18 +402,18 @@ importers:
 
   apps/mcp:
     dependencies:
-      '@hono/mcp':
-        specifier: 'catalog:'
-        version: 0.3.2(@modelcontextprotocol/sdk@1.30.1(supports-color@10.2.2)(zod@4.6.5))(hono-rate-limiter@0.5.4(hono@4.13.9)(unstorage@1.17.5(idb-keyval@6.3.0)))(hono@4.13.9)(zod@4.6.5)
-      '@modelcontextprotocol/sdk':
-        specifier: 'catalog:'
-        version: 1.30.1(supports-color@10.2.2)(zod@4.6.5)
       '@allegretto-network/api':
         specifier: workspace:*
         version: link:../api
       '@allegretto-network/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@hono/mcp':
+        specifier: 'catalog:'
+        version: 0.3.2(@modelcontextprotocol/sdk@1.30.1(supports-color@10.2.2)(zod@4.6.5))(hono-rate-limiter@0.5.4(hono@4.13.9)(unstorage@1.17.5(idb-keyval@6.3.0)))(hono@4.13.9)(zod@4.6.5)
+      '@modelcontextprotocol/sdk':
+        specifier: 'catalog:'
+        version: 1.30.1(supports-color@10.2.2)(zod@4.6.5)
       hono:
         specifier: 'catalog:'
         version: 4.13.9
@@ -442,15 +442,15 @@ importers:
 
   apps/web:
     dependencies:
-      '@privy-io/react-auth':
-        specifier: ^3.45.0
-        version: 3.45.0(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@7.0.2))(@stripe/stripe-js@1.54.2)(@tanstack/query-core@5.103.2)(@tanstack/react-query@5.103.2(react@19.3.0))(@types/react@19.3.0)(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@10.2.2)(typescript@7.0.2)(use-sync-external-store@1.4.0(react@19.3.0))(utf-8-validate@5.0.10)(zod@3.25.76)
       '@allegretto-network/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@allegretto-network/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@privy-io/react-auth':
+        specifier: ^3.45.0
+        version: 3.45.0(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@7.0.2))(@stripe/stripe-js@1.54.2)(@tanstack/query-core@5.103.2)(@tanstack/react-query@5.103.2(react@19.3.0))(@types/react@19.3.0)(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(supports-color@10.2.2)(typescript@7.0.2)(use-sync-external-store@1.4.0(react@19.3.0))(utf-8-validate@5.0.10)(zod@3.25.76)
       '@tanstack/react-router':
         specifier: ^1.170.32
         version: 1.170.39(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -528,8 +528,8 @@ importers:
       '@fontsource-variable/geist-mono':
         specifier: ^5.2.8
         version: 5.3.0
-      '@fontsource-variable/lora':
-        specifier: ^5.2.8
+      '@fontsource-variable/josefin-slab':
+        specifier: ^5.3.0
         version: 5.3.0
       class-variance-authority:
         specifier: ^0.7.1
@@ -1097,8 +1097,8 @@ packages:
   '@fontsource-variable/geist-mono@5.3.0':
     resolution: {integrity: sha512-vBbuwDEo9AkrqADMXOrlAR3DFcJi4/JxeuU43FoiQERnNwsfXNnvxvReZG02cQKmyk4DZkZdBZX3oTDvy2zBAw==}
 
-  '@fontsource-variable/lora@5.3.0':
-    resolution: {integrity: sha512-2ph8KiZ8Bn141hWuC3ErtpJ+Ui8p2MJQn8TJNRSRmLmnCIOCtHfiBM9R7WLRPeUG/q6hXyHOxWQ8DvRSX+ixvQ==}
+  '@fontsource-variable/josefin-slab@5.3.0':
+    resolution: {integrity: sha512-gKAz24ETab2aO9pbYMUKXriDJc2sNU5h7EIBlsaGye6y9NjXbAkK079awJ2mEEvu7AZxwMBESSLATEbEBfHGCQ==}
 
   '@gemini-wallet/core@0.3.2':
     resolution: {integrity: sha512-Z4aHi3ECFf5oWYWM3F1rW83GJfB9OvhBYPTmb5q+VyK3uvzvS48lwo+jwh2eOoCRWEuT/crpb9Vwp2QaS5JqgQ==}
@@ -7988,7 +7988,7 @@ snapshots:
 
   '@fontsource-variable/geist-mono@5.3.0': {}
 
-  '@fontsource-variable/lora@5.3.0': {}
+  '@fontsource-variable/josefin-slab@5.3.0': {}
 
   '@gemini-wallet/core@0.3.2(supports-color@10.2.2)(viem@2.56.8(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@5.0.10)(zod@3.25.76))':
     dependencies:
