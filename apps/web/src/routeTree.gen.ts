@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SETUPDotmdRouteImport } from './routes/SETUP[.]md'
+import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AuthVerifyRouteImport } from './routes/auth.verify'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const SETUPDotmdRoute = SETUPDotmdRouteImport.update({
   path: '/SETUP.md',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthVerifyRoute = AuthVerifyRouteImport.update({
   id: '/auth/verify',
   path: '/auth/verify',
@@ -32,30 +38,34 @@ const AuthVerifyRoute = AuthVerifyRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/SETUP.md': typeof SETUPDotmdRoute
+  '/chat': typeof ChatRoute
   '/auth/verify': typeof AuthVerifyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/SETUP.md': typeof SETUPDotmdRoute
+  '/chat': typeof ChatRoute
   '/auth/verify': typeof AuthVerifyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/SETUP.md': typeof SETUPDotmdRoute
+  '/chat': typeof ChatRoute
   '/auth/verify': typeof AuthVerifyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/SETUP.md' | '/auth/verify'
+  fullPaths: '/' | '/SETUP.md' | '/chat' | '/auth/verify'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/SETUP.md' | '/auth/verify'
-  id: '__root__' | '/' | '/SETUP.md' | '/auth/verify'
+  to: '/' | '/SETUP.md' | '/chat' | '/auth/verify'
+  id: '__root__' | '/' | '/SETUP.md' | '/chat' | '/auth/verify'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SETUPDotmdRoute: typeof SETUPDotmdRoute
+  ChatRoute: typeof ChatRoute
   AuthVerifyRoute: typeof AuthVerifyRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SETUPDotmdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/verify': {
       id: '/auth/verify'
       path: '/auth/verify'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SETUPDotmdRoute: SETUPDotmdRoute,
+  ChatRoute: ChatRoute,
   AuthVerifyRoute: AuthVerifyRoute,
 }
 export const routeTree = rootRouteImport
