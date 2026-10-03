@@ -1,5 +1,5 @@
 {
-  "name": "@hrld/api",
+  "name": "@allegretto-network/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,9 +18,9 @@
     "preview": "vp preview"
   },
   "dependencies": {
+    "@allegretto-network/core": "workspace:*",
+    "@allegretto-network/utils": "workspace:*",
     "@hono/zod-openapi": "catalog:",
-    "@hrld/core": "workspace:*",
-    "@hrld/utils": "workspace:*",
     "graphql": "catalog:",
     "graphql-request": "catalog:",
     "graphql-tag": "catalog:",

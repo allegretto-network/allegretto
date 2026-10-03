@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getJobOutputSchema, getJobParamsSchema } from "@hrld/api/rpc";
+import { getJobOutputSchema, getJobParamsSchema } from "@allegretto-network/api/rpc";
 
 import { ApiClient } from "../lib/api";
 import { errorResult, jsonResult, toolOutputSchema } from "../lib/mcp";

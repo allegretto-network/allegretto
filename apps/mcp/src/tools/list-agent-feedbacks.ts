@@ -3,7 +3,7 @@ import {
   listAgentFeedbacksOutputSchema,
   listAgentFeedbacksParamsSchema,
   listAgentFeedbacksQuerySchema,
-} from "@hrld/api/rpc";
+} from "@allegretto-network/api/rpc";
 import { z } from "zod";
 
 import { ApiClient } from "../lib/api";

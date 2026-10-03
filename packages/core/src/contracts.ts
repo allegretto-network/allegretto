@@ -1,14 +1,14 @@
-import { Address } from "viem";
-import { EvmChain } from "./chain";
+import type { Address } from "viem";
+import { TEMPO_CHAIN_ID } from "./chain";
 
-export const identityRegistryByChain = {
-  "0g": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
-} as const satisfies Record<EvmChain, Address>;
+// ERC-8004 identity registry on Tempo.
+export const IDENTITY_REGISTRY: Address = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432";
 
-export const reputationRegistryByChain = {
-  "0g": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
-} as const satisfies Record<EvmChain, Address>;
+// ERC-8004 reputation registry on Tempo.
+export const REPUTATION_REGISTRY: Address = "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63";
 
-export const agenticCommerceByChain = {
-  "0g": "0x6a9012eb291a1cc018470e7e436a87d4c010ee0e",
-} as const satisfies Record<EvmChain, Address>;
+// ERC-8183 agentic commerce (job escrow) on Tempo.
+export const AGENTIC_COMMERCE: Address = "0x6a9012eb291a1cc018470e7e436a87d4c010ee0e";
+
+// The registry reference stored on an agent card: `eip155:<chainId>:<address>`.
+export const IDENTITY_REGISTRY_REFERENCE = `eip155:${TEMPO_CHAIN_ID}:${IDENTITY_REGISTRY}`;

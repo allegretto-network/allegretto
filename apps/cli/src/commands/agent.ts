@@ -1,12 +1,16 @@
 import fs from "node:fs/promises";
-import { type EvmChain, viemChainByChain, type Wallet } from "@hrld/core";
-import { erc8004IdentityRegistryAbi } from "@hrld/core/abis/erc8004";
+import {
+  IDENTITY_REGISTRY,
+  IDENTITY_REGISTRY_REFERENCE,
+  type Wallet,
+} from "@allegretto-network/core";
+import { erc8004IdentityRegistryAbi } from "@allegretto-network/core/abis/erc8004";
 import pc from "picocolors";
 import { v4 as uuidv4 } from "uuid";
 import { createPublicClient, createWalletClient, http, parseEventLogs } from "viem";
+import { tempo } from "viem/chains";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
-import { identityRegistryByChain } from "@hrld/core";
 import {
   type AgentCard,
   type AgentService,
@@ -25,7 +29,6 @@ import { formatScore } from "../lib/feedback.ts";
 import { openSession, requireUserId, requireWallet } from "../lib/session.ts";
 import type { WalletSession } from "../lib/privy.ts";
 import { toWalletAccount } from "../lib/viem.ts";
-import { activeChain, chainDisplayName } from "../utils/chain.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
 import {
@@ -51,7 +54,7 @@ const list = zodCommand({
     const result = await listAgents().catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
     if (result.agents.length === 0)
-      return ok(pc.dim("No agents yet. Run `hrld agent create`."), result)(json);
+      return ok(pc.dim("No agents yet. Run `alln agent create`."), result)(json);
 
     const nameWidth = Math.max(
       ...result.agents.map((agent) => truncate(agent.card.name, 24).length),
@@ -82,7 +85,7 @@ function registrationLabel(card: AgentCard): string {
 
 const discover = zodCommand({
   name: "discover",
-  description: "Search onchain ACP agents",
+  description: "Search onchain agents",
   args: {
     query: z.string().describe("Search text"),
   },
@@ -213,18 +216,18 @@ async function createAgent(opts: {
 
 const profile = zodCommand({
   name: "profile",
-  description: "Show a local agent's card, or an onchain ACP agent's profile",
+  description: "Show a local agent's card, or an onchain agent's profile",
   args: {
-    agentId: z.string().describe("Local agent id (uuid), or onchain agent id with --acp"),
+    agentId: z.string().describe("Local agent id (uuid), or onchain agent id with --onchain"),
   },
   opts: {
-    acp: z.boolean().prefault(false).describe("Look up <agentId> as an onchain ACP agent id"),
+    onchain: z.boolean().prefault(false).describe("Look up <agentId> as an onchain agent id"),
   },
   action: async (args, opts) => {
     const json = isJson(profile);
 
-    if (opts.acp) {
-      const result = await readAcpProfile(args.agentId).catch((error: Error) => error);
+    if (opts.onchain) {
+      const result = await readOnchainProfile(args.agentId).catch((error: Error) => error);
       if (result instanceof Error) return err(result)(json);
 
       const tags = topTags(result.reputation.tags);
@@ -244,7 +247,7 @@ const profile = zodCommand({
             ],
           ]),
           ...(result.reputation.count > 0
-            ? ["", pc.dim(`Run \`hrld agent feedback list ${result.id}\` to read the feedback.`)]
+            ? ["", pc.dim(`Run \`alln agent feedback list ${result.id}\` to read the feedback.`)]
             : []),
         ].join("\n"),
         result,
@@ -271,7 +274,7 @@ const profile = zodCommand({
               (registration) =>
                 `  #${registration.agentId} on ${pc.cyan(registration.agentRegistry)}`,
             )
-          : [pc.dim("  none — run `hrld agent push <agentId>`")]),
+          : [pc.dim("  none — run `alln agent push <agentId>`")]),
         "",
         pc.dim("Services"),
         ...(result.card.services.length > 0
@@ -288,10 +291,10 @@ async function readProfile(agentId: string) {
   return { id: agentId, card: await readAgentCard(userId, agentId) };
 }
 
-async function readAcpProfile(agentId: string) {
+async function readOnchainProfile(agentId: string) {
   const agent = await requestJson(
     api.v1.agents[":agentId"].$get({ param: { agentId: requireOnchainAgentId(agentId) } }),
-    acpAgentNotFound(agentId),
+    onchainAgentNotFound(agentId),
   );
   // Deployed APIs may predate the reputation aggregates; fall back to the
   // bare feedback count so profile keeps working across version skew.
@@ -301,11 +304,11 @@ async function readAcpProfile(agentId: string) {
   };
 }
 
-function acpAgentNotFound(agentId: string): CliError {
+function onchainAgentNotFound(agentId: string): CliError {
   return new CliError(
     "AGENT_NOT_FOUND",
     `No onchain agent with id ${agentId}.`,
-    "Run `hrld agent discover <query>` to find onchain agents.",
+    "Run `alln agent discover <query>` to find onchain agents.",
   );
 }
 
@@ -461,7 +464,7 @@ const deactivate = zodCommand({
           ["Name", pc.bold(result.card.name)],
           ["Status", statusLabel(result.card)],
         ]),
-        pc.dim("Run `hrld agent push <agentId>` to publish the change onchain."),
+        pc.dim("Run `alln agent push <agentId>` to publish the change onchain."),
       ].join("\n"),
       result,
     )(json);
@@ -485,18 +488,18 @@ function statusLabel(card: AgentCard): string {
 
 const serviceList = zodCommand({
   name: "list",
-  description: "List a local agent's services, or an onchain ACP agent's services",
+  description: "List a local agent's services, or an onchain agent's services",
   args: {
-    agentId: z.string().describe("Local agent id (uuid), or onchain agent id with --acp"),
+    agentId: z.string().describe("Local agent id (uuid), or onchain agent id with --onchain"),
   },
   opts: {
-    acp: z.boolean().prefault(false).describe("Look up <agentId> as an onchain ACP agent id"),
+    onchain: z.boolean().prefault(false).describe("Look up <agentId> as an onchain agent id"),
   },
   action: async (args, opts) => {
     const json = isJson(serviceList);
 
-    if (opts.acp) {
-      const result = await listAcpServices(args.agentId).catch((error: Error) => error);
+    if (opts.onchain) {
+      const result = await listOnchainServices(args.agentId).catch((error: Error) => error);
       if (result instanceof Error) return err(result)(json);
       if (result.services.length === 0)
         return ok(pc.dim("This onchain agent has no services."), result)(json);
@@ -519,7 +522,7 @@ const serviceList = zodCommand({
     if (result.services.length === 0)
       return ok(
         pc.dim(
-          "No services yet. Run `hrld agent service add <agentId> --name <name> --endpoint <uri>`.",
+          "No services yet. Run `alln agent service add <agentId> --name <name> --endpoint <uri>`.",
         ),
         result,
       )(json);
@@ -536,12 +539,12 @@ async function listServices(agentId: string) {
   return { id: agentId, services: (await readAgentCard(userId, agentId)).services };
 }
 
-async function listAcpServices(agentId: string) {
+async function listOnchainServices(agentId: string) {
   const services = await requestJson(
     api.v1.agents[":agentId"].services.$get({
       param: { agentId: requireOnchainAgentId(agentId) },
     }),
-    acpAgentNotFound(agentId),
+    onchainAgentNotFound(agentId),
   );
   return { id: agentId, services };
 }
@@ -604,7 +607,7 @@ const serviceUpdate = zodCommand({
       .number()
       .int()
       .nonnegative()
-      .describe("Service index from `hrld agent service list`"),
+      .describe("Service index from `alln agent service list`"),
   },
   opts: {
     name: z.string().optional().describe("n;Service name"),
@@ -661,7 +664,7 @@ const serviceRemove = zodCommand({
       .number()
       .int()
       .nonnegative()
-      .describe("Service index from `hrld agent service list`"),
+      .describe("Service index from `alln agent service list`"),
   },
   action: async (args) => {
     const json = isJson(serviceRemove);
@@ -691,7 +694,7 @@ function requireService(card: AgentCard, agentId: string, index: number): AgentS
     throw new CliError(
       "AGENT_SERVICE_NOT_FOUND",
       `Agent ${agentId} has no service at index ${index}.`,
-      "Run `hrld agent service list <agentId>` to see service indexes.",
+      "Run `alln agent service list <agentId>` to see service indexes.",
     );
 
   return service;
@@ -714,16 +717,14 @@ const push = zodCommand({
     // commander camelCases --dry-run; zod-commander's opts type keeps the literal key.
     const dryRun = (opts as { dryRun?: boolean }).dryRun === true;
 
-    const result = await pushAgent(activeChain, args.agentId, dryRun, json).catch(
-      (error: Error) => error,
-    );
+    const result = await pushAgent(args.agentId, dryRun, json).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     if (result.dryRun)
       return ok(
         fields([
           ["Agent", `${pc.bold(result.name)} ${pc.dim(`(${result.id})`)}`],
-          ["Chain", pc.bold(chainDisplayName[result.chain])],
+          ["Chain", pc.bold(tempo.name)],
           ["Wallet", pc.cyan(result.address)],
           ["Registry", result.agentRegistry],
           [
@@ -750,7 +751,7 @@ const push = zodCommand({
         success("Agent pushed"),
         fields([
           ["Agent", `${pc.bold(result.name)} ${pc.dim(`(${result.id})`)}`],
-          ["Chain", pc.bold(chainDisplayName[result.chain])],
+          ["Chain", pc.bold(tempo.name)],
           ["Onchain Agent ID", `#${result.onchainAgentId}`],
           ["Registry", result.agentRegistry],
           ...(result.registerTxHash
@@ -764,19 +765,18 @@ const push = zodCommand({
   },
 });
 
-async function pushAgent(chain: EvmChain, agentId: string, dryRun: boolean, json: boolean) {
+async function pushAgent(agentId: string, dryRun: boolean, json: boolean) {
   const userId = await requireUserId();
   const card = await readAgentCard(userId, agentId);
   const session = await openSession();
-  const wallet = requireWallet(session, chain);
+  const wallet = requireWallet(session);
 
-  const agentRegistry = `eip155:${viemChainByChain[chain].id}:${identityRegistryByChain[chain]}`;
+  const agentRegistry = IDENTITY_REGISTRY_REFERENCE;
   const existing = card.registrations?.find((entry) => entry.agentRegistry === agentRegistry);
 
   if (dryRun)
     return {
       dryRun: true as const,
-      chain,
       id: agentId,
       name: card.name,
       address: wallet.address,
@@ -788,7 +788,7 @@ async function pushAgent(chain: EvmChain, agentId: string, dryRun: boolean, json
 
   const registered = existing
     ? { registration: existing, txHash: null }
-    : await registerAgent(chain, session, wallet, agentRegistry, json);
+    : await registerAgent(session, wallet, agentRegistry, json);
 
   // The onchain id is persisted before setAgentURI so a failure there cannot
   // orphan the registration; re-running push then skips register().
@@ -805,22 +805,21 @@ async function pushAgent(chain: EvmChain, agentId: string, dryRun: boolean, json
   progress(json, `Setting agent URI (${agentUri.length} bytes)…`);
   const setUriTxHash = await createWalletClient({
     account: toWalletAccount(session, wallet),
-    chain: viemChainByChain[chain],
+    chain: tempo,
     transport: http(),
   }).writeContract({
-    address: identityRegistryByChain[chain],
+    address: IDENTITY_REGISTRY,
     abi: erc8004IdentityRegistryAbi,
     functionName: "setAgentURI",
     args: [BigInt(registered.registration.agentId), agentUri],
   });
   await createPublicClient({
-    chain: viemChainByChain[chain],
+    chain: tempo,
     transport: http(),
   }).waitForTransactionReceipt({ hash: setUriTxHash });
 
   return {
     dryRun: false as const,
-    chain,
     id: agentId,
     name: next.name,
     address: wallet.address,
@@ -836,7 +835,6 @@ async function pushAgent(chain: EvmChain, agentId: string, dryRun: boolean, json
 // after the transaction confirms — and both the card's registrations entry and
 // the final data URI need that id.
 async function registerAgent(
-  chain: EvmChain,
   session: WalletSession,
   wallet: Wallet,
   agentRegistry: string,
@@ -845,17 +843,17 @@ async function registerAgent(
   progress(json, "Registering agent onchain…");
   const txHash = await createWalletClient({
     account: toWalletAccount(session, wallet),
-    chain: viemChainByChain[chain],
+    chain: tempo,
     transport: http(),
   }).writeContract({
-    address: identityRegistryByChain[chain],
+    address: IDENTITY_REGISTRY,
     abi: erc8004IdentityRegistryAbi,
     functionName: "register",
     args: [],
   });
 
   const receipt = await createPublicClient({
-    chain: viemChainByChain[chain],
+    chain: tempo,
     transport: http(),
   }).waitForTransactionReceipt({ hash: txHash });
   const events = parseEventLogs({
@@ -869,7 +867,7 @@ async function registerAgent(
     throw new CliError(
       "AGENT_SYNC_FAILED",
       "The register transaction confirmed but emitted no Registered event.",
-      `Inspect transaction ${txHash}, then re-run \`hrld agent push\`.`,
+      `Inspect transaction ${txHash}, then re-run \`alln agent push\`.`,
     );
 
   return { registration: { agentId: Number(onchainAgentId), agentRegistry }, txHash };
@@ -894,7 +892,7 @@ const pull = zodCommand({
     // commander camelCases --agent-id; zod-commander's opts type keeps the literal key.
     const onchainAgentId = (opts as { agentId?: string }).agentId;
 
-    const result = await pullAgents(activeChain, onchainAgentId).catch((error: Error) => error);
+    const result = await pullAgents(onchainAgentId).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
     if (result.pulled.length === 0 && result.skipped.length === 0)
       return ok(pc.dim("This wallet owns no onchain agents with a data: agent URI."), result)(json);
@@ -918,11 +916,11 @@ const pull = zodCommand({
   },
 });
 
-async function pullAgents(chain: EvmChain, onchainAgentId: string | undefined) {
+async function pullAgents(onchainAgentId: string | undefined) {
   const userId = await requireUserId();
   const session = await openSession();
-  const wallet = requireWallet(session, chain);
-  const agentRegistry = `eip155:${viemChainByChain[chain].id}:${identityRegistryByChain[chain]}`;
+  const wallet = requireWallet(session);
+  const agentRegistry = IDENTITY_REGISTRY_REFERENCE;
 
   const agents = onchainAgentId
     ? [await readOwnedAgent(onchainAgentId, wallet.address)]
@@ -971,7 +969,7 @@ async function readOwnedAgent(onchainAgentId: string, address: string) {
     api.v1.agents[":agentId"].$get({
       param: { agentId: requireOnchainAgentId(onchainAgentId) },
     }),
-    acpAgentNotFound(onchainAgentId),
+    onchainAgentNotFound(onchainAgentId),
   );
   if (agent.owner.toLowerCase() !== address.toLowerCase())
     throw new CliError(

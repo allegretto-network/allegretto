@@ -1,12 +1,6 @@
-import {
-  agenticCommerceByChain,
-  type EvmChain,
-  reputationRegistryByChain,
-  viemChainByChain,
-  type Wallet,
-} from "@hrld/core";
-import { erc8004ReputationRegistryAbi } from "@hrld/core/abis/erc8004";
-import { erc8183AgenticCommerceAbi } from "@hrld/core/abis/erc8183";
+import { AGENTIC_COMMERCE, REPUTATION_REGISTRY, type Wallet } from "@allegretto-network/core";
+import { erc8004ReputationRegistryAbi } from "@allegretto-network/core/abis/erc8004";
+import { erc8183AgenticCommerceAbi } from "@allegretto-network/core/abis/erc8183";
 import pc from "picocolors";
 import {
   type Address,
@@ -17,6 +11,7 @@ import {
   parseEventLogs,
   zeroAddress,
 } from "viem";
+import { tempo } from "viem/chains";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
 import { api, requestJson, requireOnchainAgentId } from "../lib/api.ts";
@@ -29,14 +24,13 @@ import {
 import type { WalletSession } from "../lib/privy.ts";
 import { openSession, requireWallet } from "../lib/session.ts";
 import { toWalletAccount } from "../lib/viem.ts";
-import { activeChain, chainDisplayName } from "../utils/chain.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
 import { err, fields, formatRelative, isJson, ok, shortAddress, success } from "../utils/result.ts";
 
 const give = zodCommand({
   name: "give",
-  description: "Give onchain ERC-8004 feedback to an ACP agent, as this wallet",
+  description: "Give onchain ERC-8004 feedback to an onchain agent, as this wallet",
   args: {
     agentId: z.string().describe("Onchain agent id"),
   },
@@ -63,7 +57,7 @@ const give = zodCommand({
     // commander camelCases --dry-run; zod-commander's opts type keeps the literal key.
     const dryRun = (opts as { dryRun?: boolean }).dryRun === true;
 
-    const result = await giveFeedback(activeChain, args.agentId, { ...opts, dryRun }, json).catch(
+    const result = await giveFeedback(args.agentId, { ...opts, dryRun }, json).catch(
       (error: Error) => error,
     );
     if (result instanceof Error) return err(result)(json);
@@ -72,7 +66,7 @@ const give = zodCommand({
       return ok(
         fields([
           ["Agent", `${pc.bold(result.agentName)} ${pc.dim(`(#${result.agentId})`)}`],
-          ["Chain", pc.bold(chainDisplayName[result.chain])],
+          ["Chain", pc.bold(tempo.name)],
           ["Wallet", pc.cyan(result.client)],
           ["Registry", result.registry],
           ["Score", `★ ${formatScore(result.score)}`],
@@ -99,7 +93,7 @@ const give = zodCommand({
           ["Tx", pc.cyan(result.txHash)],
         ]),
         "",
-        pc.dim(`Run \`hrld agent feedback list ${result.agentId}\` to see it once indexed.`),
+        pc.dim(`Run \`alln agent feedback list ${result.agentId}\` to see it once indexed.`),
       ].join("\n"),
       result,
     )(json);
@@ -107,7 +101,6 @@ const give = zodCommand({
 });
 
 async function giveFeedback(
-  chain: EvmChain,
   agentId: string,
   opts: {
     score: number;
@@ -127,14 +120,14 @@ async function giveFeedback(
   );
 
   const session = await openSession();
-  const wallet = requireWallet(session, chain);
+  const wallet = requireWallet(session);
   if (agent.owner.toLowerCase() === wallet.address.toLowerCase())
     throw new CliError(
       "FEEDBACK_ACTION_FAILED",
       `This wallet owns agent #${agentId} — feedback must come from a client.`,
     );
 
-  if (opts.job !== undefined) await requireSettledJobAsClient(chain, opts.job, agentId, wallet);
+  if (opts.job !== undefined) await requireSettledJobAsClient(opts.job, agentId, wallet);
 
   // The job id lands inside the document so feedback stays traceable to the
   // work it rates; an explicit jobId in --data/--file stays authoritative.
@@ -146,11 +139,10 @@ async function giveFeedback(
   const { uri, hash } = document === null ? emptyFeedbackUri : toFeedbackUri(document);
 
   const shared = {
-    chain,
     agentId,
     agentName: agent.name,
     client: wallet.address,
-    registry: reputationRegistryByChain[chain],
+    registry: REPUTATION_REGISTRY,
     score: opts.score,
     tag1: opts.tag1 ?? null,
     tag2: opts.tag2 ?? null,
@@ -162,9 +154,9 @@ async function giveFeedback(
   if (opts.dryRun) return { dryRun: true as const, ...shared };
 
   progress(json, `Giving feedback to agent #${agentId}…`);
-  const txHash = await walletClient(chain, session, wallet)
+  const txHash = await walletClient(session, wallet)
     .writeContract({
-      address: reputationRegistryByChain[chain],
+      address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "giveFeedback",
       args: [
@@ -179,7 +171,7 @@ async function giveFeedback(
       ],
     })
     .catch(rethrowRevert("give the feedback"));
-  const receipt = await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  const receipt = await publicClient().waitForTransactionReceipt({ hash: txHash });
 
   const feedbackIndex = parseEventLogs({
     abi: erc8004ReputationRegistryAbi,
@@ -190,7 +182,7 @@ async function giveFeedback(
     throw new CliError(
       "FEEDBACK_ACTION_FAILED",
       "The giveFeedback transaction confirmed but emitted no NewFeedback event.",
-      `Inspect transaction ${txHash}, then check \`hrld agent feedback list ${agentId}\`.`,
+      `Inspect transaction ${txHash}, then check \`alln agent feedback list ${agentId}\`.`,
     );
 
   return { dryRun: false as const, ...shared, feedbackIndex: Number(feedbackIndex), txHash };
@@ -199,17 +191,12 @@ async function giveFeedback(
 // Feedback tied to a job must come from that job's client, target the job's
 // provider agent, and follow settlement — expiry counts as settled because
 // the contract never stores the EXPIRED status.
-async function requireSettledJobAsClient(
-  chain: EvmChain,
-  jobId: string,
-  agentId: string,
-  wallet: Wallet,
-) {
+async function requireSettledJobAsClient(jobId: string, agentId: string, wallet: Wallet) {
   if (!/^\d+$/.test(jobId))
     throw new CliError("FEEDBACK_INPUT_INVALID", `${jobId} is not an onchain job id.`);
 
-  const job = await publicClient(chain).readContract({
-    address: agenticCommerceByChain[chain],
+  const job = await publicClient().readContract({
+    address: AGENTIC_COMMERCE,
     abi: erc8183AgenticCommerceAbi,
     functionName: "getJob",
     args: [BigInt(jobId)],
@@ -234,7 +221,7 @@ async function requireSettledJobAsClient(
     throw new CliError(
       "FEEDBACK_ACTION_FAILED",
       `Job #${jobId} is not settled yet.`,
-      `Complete or reject it first: hrld agent job complete ${jobId}`,
+      `Complete or reject it first: alln agent job complete ${jobId}`,
     );
 }
 
@@ -245,7 +232,7 @@ function tagsLabel(tag1: string | null, tag2: string | null): string {
 
 const list = zodCommand({
   name: "list",
-  description: "List feedback left for an onchain ACP agent",
+  description: "List feedback left for an onchain agent",
   args: {
     agentId: z.string().describe("Onchain agent id"),
   },
@@ -352,19 +339,19 @@ async function listFeedbacks(
 
 const revoke = zodCommand({
   name: "revoke",
-  description: "Revoke feedback this wallet gave to an onchain ACP agent",
+  description: "Revoke feedback this wallet gave to an onchain agent",
   args: {
     agentId: z.string().describe("Onchain agent id"),
     feedbackIndex: z.coerce
       .number()
       .int()
       .positive()
-      .describe("Per-client feedback index from `hrld agent feedback list`"),
+      .describe("Per-client feedback index from `alln agent feedback list`"),
   },
   action: async (args) => {
     const json = isJson(revoke);
 
-    const result = await revokeFeedback(activeChain, args.agentId, args.feedbackIndex, json).catch(
+    const result = await revokeFeedback(args.agentId, args.feedbackIndex, json).catch(
       (error: Error) => error,
     );
     if (result instanceof Error) return err(result)(json);
@@ -385,12 +372,12 @@ const revoke = zodCommand({
   },
 });
 
-async function revokeFeedback(chain: EvmChain, agentId: string, index: number, json: boolean) {
+async function revokeFeedback(agentId: string, index: number, json: boolean) {
   const id = BigInt(requireOnchainAgentId(agentId));
   const session = await openSession();
-  const wallet = requireWallet(session, chain);
+  const wallet = requireWallet(session);
 
-  const existing = await requireFeedback(chain, id, wallet.address as Address, BigInt(index));
+  const existing = await requireFeedback(id, wallet.address as Address, BigInt(index));
   if (existing.isRevoked)
     throw new CliError(
       "FEEDBACK_ACTION_FAILED",
@@ -398,22 +385,22 @@ async function revokeFeedback(chain: EvmChain, agentId: string, index: number, j
     );
 
   progress(json, `Revoking feedback #${index} on agent #${agentId}…`);
-  const txHash = await walletClient(chain, session, wallet)
+  const txHash = await walletClient(session, wallet)
     .writeContract({
-      address: reputationRegistryByChain[chain],
+      address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "revokeFeedback",
       args: [id, BigInt(index)],
     })
     .catch(rethrowRevert("revoke the feedback"));
-  await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  await publicClient().waitForTransactionReceipt({ hash: txHash });
 
-  return { chain, agentId, feedbackIndex: index, client: wallet.address, txHash };
+  return { agentId, feedbackIndex: index, client: wallet.address, txHash };
 }
 
 const respond = zodCommand({
   name: "respond",
-  description: "Append a response to feedback on an onchain ACP agent, e.g. as its owner",
+  description: "Append a response to feedback on an onchain agent, e.g. as its owner",
   args: {
     agentId: z.string().describe("Onchain agent id"),
     client: z.string().describe("Client address that gave the feedback"),
@@ -421,7 +408,7 @@ const respond = zodCommand({
       .number()
       .int()
       .positive()
-      .describe("Per-client feedback index from `hrld agent feedback list`"),
+      .describe("Per-client feedback index from `alln agent feedback list`"),
   },
   opts: {
     data: jsonStringSchema.optional().describe("d;Response document as a JSON string"),
@@ -431,7 +418,6 @@ const respond = zodCommand({
     const json = isJson(respond);
 
     const result = await respondToFeedback(
-      activeChain,
       args.agentId,
       args.client,
       args.feedbackIndex,
@@ -456,7 +442,6 @@ const respond = zodCommand({
 });
 
 async function respondToFeedback(
-  chain: EvmChain,
   agentId: string,
   client: string,
   index: number,
@@ -475,28 +460,28 @@ async function respondToFeedback(
     );
   const { uri, hash } = toFeedbackUri(document);
 
-  await requireFeedback(chain, id, address, BigInt(index));
+  await requireFeedback(id, address, BigInt(index));
 
   progress(json, `Responding to feedback #${index} on agent #${agentId}…`);
-  const txHash = await walletClient(chain, await openSession())
+  const txHash = await walletClient(await openSession())
     .writeContract({
-      address: reputationRegistryByChain[chain],
+      address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "appendResponse",
       args: [id, address, BigInt(index), uri, hash],
     })
     .catch(rethrowRevert("respond to the feedback"));
-  await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  await publicClient().waitForTransactionReceipt({ hash: txHash });
 
-  return { chain, agentId, client: address, feedbackIndex: index, uri, hash, txHash };
+  return { agentId, client: address, feedbackIndex: index, uri, hash, txHash };
 }
 
 // Feedback indexes are 1-based per client; getLastIndex returns 0 when the
 // client never gave feedback. Checking upfront turns opaque reverts into
 // actionable errors.
-async function requireFeedback(chain: EvmChain, agentId: bigint, client: Address, index: bigint) {
-  const lastIndex = await publicClient(chain).readContract({
-    address: reputationRegistryByChain[chain],
+async function requireFeedback(agentId: bigint, client: Address, index: bigint) {
+  const lastIndex = await publicClient().readContract({
+    address: REPUTATION_REGISTRY,
     abi: erc8004ReputationRegistryAbi,
     functionName: "getLastIndex",
     args: [agentId, client],
@@ -507,11 +492,11 @@ async function requireFeedback(chain: EvmChain, agentId: bigint, client: Address
       lastIndex === 0n
         ? `${client} has given agent #${agentId} no feedback.`
         : `${client} has feedback indexes 1 to ${lastIndex} on agent #${agentId}, not ${index}.`,
-      `Run \`hrld agent feedback list ${agentId}\` to see feedback indexes.`,
+      `Run \`alln agent feedback list ${agentId}\` to see feedback indexes.`,
     );
 
-  const [, , , , isRevoked] = await publicClient(chain).readContract({
-    address: reputationRegistryByChain[chain],
+  const [, , , , isRevoked] = await publicClient().readContract({
+    address: REPUTATION_REGISTRY,
     abi: erc8004ReputationRegistryAbi,
     functionName: "readFeedback",
     args: [agentId, client, index],
@@ -529,22 +514,18 @@ function agentNotFound(agentId: string): CliError {
   return new CliError(
     "AGENT_NOT_FOUND",
     `No onchain agent with id ${agentId}.`,
-    "Run `hrld agent discover <query>` to find onchain agents.",
+    "Run `alln agent discover <query>` to find onchain agents.",
   );
 }
 
-function publicClient(chain: EvmChain) {
-  return createPublicClient({ chain: viemChainByChain[chain], transport: http() });
+function publicClient() {
+  return createPublicClient({ chain: tempo, transport: http() });
 }
 
-function walletClient(
-  chain: EvmChain,
-  session: WalletSession,
-  wallet: Wallet = requireWallet(session, chain),
-) {
+function walletClient(session: WalletSession, wallet: Wallet = requireWallet(session)) {
   return createWalletClient({
     account: toWalletAccount(session, wallet),
-    chain: viemChainByChain[chain],
+    chain: tempo,
     transport: http(),
   });
 }
@@ -567,7 +548,7 @@ function progress(json: boolean, message: string) {
 
 export const feedback = zodCommand({
   name: "feedback",
-  description: "Give, list, revoke, and respond to ERC-8004 feedback on onchain ACP agents",
+  description: "Give, list, revoke, and respond to ERC-8004 feedback on onchain agents",
 })
   .addCommand(give)
   .addCommand(list)

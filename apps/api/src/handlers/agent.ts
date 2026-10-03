@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { problemDetailsResponse } from "hono-problem-details/openapi";
 import { problemDetails } from "hono-problem-details";
 
-import { EVM_CHAIN_IDS, identityRegistryByChain } from "@hrld/core";
+import { IDENTITY_REGISTRY, TEMPO_CHAIN_ID } from "@allegretto-network/core";
 
 import { AgentSummaryFragment } from "../lib/subgraphs/__generated/erc-8004";
 import { Env } from "../env";
@@ -117,8 +117,7 @@ const notFound = (agentId: string) =>
     type: "Agent",
   });
 
-const entityId = (agentId: string) =>
-  agentEntityId(EVM_CHAIN_IDS["0g"], identityRegistryByChain["0g"], agentId);
+const entityId = (agentId: string) => agentEntityId(TEMPO_CHAIN_ID, IDENTITY_REGISTRY, agentId);
 
 const attributeValue = (attribute: { value: string; valueType: string }): unknown => {
   if (attribute.valueType === "NUMBER") return Number(attribute.value);

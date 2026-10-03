@@ -1,17 +1,10 @@
-import {
-  agenticCommerceByChain,
-  type EvmChain,
-  viemChainByChain,
-  type Wallet,
-  WRAPPED_NATIVE_TOKEN,
-} from "@hrld/core";
-import { erc8183AgenticCommerceAbi } from "@hrld/core/abis/erc8183";
+import { AGENTIC_COMMERCE, type Wallet } from "@allegretto-network/core";
+import { erc8183AgenticCommerceAbi } from "@allegretto-network/core/abis/erc8183";
 import pc from "picocolors";
 import {
   type Address,
   createPublicClient,
   createWalletClient,
-  erc20Abi,
   http,
   isAddress,
   parseEventLogs,
@@ -19,6 +12,8 @@ import {
   zeroAddress,
   zeroHash,
 } from "viem";
+import { tempo } from "viem/chains";
+import { Abis } from "viem/tempo";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
 import { api, requestJson, requireOnchainAgentId } from "../lib/api.ts";
@@ -32,7 +27,6 @@ import {
   type TokenMetadata,
 } from "../lib/token.ts";
 import { toWalletAccount } from "../lib/viem.ts";
-import { activeChain } from "../utils/chain.ts";
 import { CliError } from "../utils/errors.ts";
 import {
   err,
@@ -125,7 +119,7 @@ async function listJobs(opts: {
   if (opts.agentId !== undefined && !opts.assigned)
     throw new CliError("FLAG_CONFLICT", "--agent-id only filters assigned jobs; add --assigned.");
 
-  const address = requireWallet(await openSession(), activeChain).address;
+  const address = requireWallet(await openSession()).address;
   const jobs = await requestJson(
     api.v1.jobs.$get({
       query: {
@@ -177,9 +171,7 @@ async function readBudgetTokens(jobs: JobSummary[]): Promise<Record<string, Toke
   const tokens = [...new Set(jobs.flatMap((job) => (job.budget ? [job.budget.token] : [])))];
   return Object.fromEntries(
     await Promise.all(
-      tokens.map(
-        async (token) => [token, await readTokenMetadata(activeChain, token as Address)] as const,
-      ),
+      tokens.map(async (token) => [token, await readTokenMetadata(token as Address)] as const),
     ),
   );
 }
@@ -228,7 +220,7 @@ const create = zodCommand({
     const json = isJson(create);
     const { agentId, expiresIn } = opts as unknown as { agentId: string; expiresIn: string };
 
-    const result = await createJob(activeChain, args.description, agentId, expiresIn, json).catch(
+    const result = await createJob(args.description, agentId, expiresIn, json).catch(
       (error: Error) => error,
     );
     if (result instanceof Error) return err(result)(json);
@@ -248,26 +240,22 @@ const create = zodCommand({
           ["Tx", pc.cyan(result.txHash)],
         ]),
         "",
-        pc.dim(`Next: the provider prices it — hrld agent job set-budget ${result.jobId} <budget>`),
+        pc.dim(
+          `Next: the provider prices it — alln agent job set-budget ${result.jobId} --token <address> --amount <amount>`,
+        ),
       ].join("\n"),
       result,
     )(json);
   },
 });
 
-async function createJob(
-  chain: EvmChain,
-  description: string,
-  agentId: string,
-  expiresIn: string,
-  json: boolean,
-) {
+async function createJob(description: string, agentId: string, expiresIn: string, json: boolean) {
   const agent = await requestJson(
     api.v1.agents[":agentId"].$get({ param: { agentId: requireOnchainAgentId(agentId) } }),
     new CliError(
       "AGENT_NOT_FOUND",
       `No onchain agent with id ${agentId}.`,
-      "Run `hrld agent discover <query>` to find onchain agents.",
+      "Run `alln agent discover <query>` to find onchain agents.",
     ),
   );
 
@@ -280,7 +268,7 @@ async function createJob(
     throw new CliError("JOB_ACTION_FAILED", `Agent #${agentId} has no valid provider address.`);
 
   const session = await openSession();
-  const wallet = requireWallet(session, chain);
+  const wallet = requireWallet(session);
   if (provider.toLowerCase() === wallet.address.toLowerCase())
     throw new CliError(
       "JOB_ACTION_FAILED",
@@ -290,9 +278,9 @@ async function createJob(
   const expiresAt = Math.floor(Date.now() / 1000) + parseDuration(expiresIn);
 
   progress(json, `Creating job for agent #${agentId}…`);
-  const txHash = await walletClient(chain, session, wallet)
+  const txHash = await walletClient(session, wallet)
     .writeContract({
-      address: agenticCommerceByChain[chain],
+      address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "createJob",
       args: [
@@ -305,7 +293,7 @@ async function createJob(
       ],
     })
     .catch(rethrowRevert("create the job"));
-  const receipt = await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  const receipt = await publicClient().waitForTransactionReceipt({ hash: txHash });
 
   const jobId = parseEventLogs({
     abi: erc8183AgenticCommerceAbi,
@@ -316,11 +304,10 @@ async function createJob(
     throw new CliError(
       "JOB_ACTION_FAILED",
       "The createJob transaction confirmed but emitted no JobCreated event.",
-      `Inspect transaction ${txHash}, then check \`hrld agent job list\`.`,
+      `Inspect transaction ${txHash}, then check \`alln agent job list\`.`,
     );
 
   return {
-    chain,
     jobId: jobId.toString(),
     agentId,
     agentName: agent.name,
@@ -346,14 +333,14 @@ const setBudget = zodCommand({
   description: "Set a job's price as its provider",
   args: {
     jobId: z.string().describe("Onchain job id"),
-    budget: z.string().describe("Budget in token units, or raw base units with --as-unit"),
   },
   opts: {
     token: z
       .string()
-      .optional()
-      .describe("t;Payment token address (must be whitelisted); omit for wrapped native (W0G)"),
-    "as-unit": z.boolean().prefault(false).describe("Treat <budget> as raw base units"),
+      .regex(/^0x[0-9a-fA-F]{40}$/, "Expected a 0x-prefixed address")
+      .describe("t;TIP-20 payment token address (must be whitelisted by the escrow)"),
+    amount: z.string().describe("a;Budget in token units, or raw base units with --as-unit"),
+    "as-unit": z.boolean().prefault(false).describe("Treat --amount as raw base units"),
   },
   action: async (args, opts) => {
     const json = isJson(setBudget);
@@ -361,9 +348,8 @@ const setBudget = zodCommand({
     const asUnit = (opts as { asUnit?: boolean }).asUnit === true;
 
     const result = await setJobBudget(
-      activeChain,
       args.jobId,
-      args.budget,
+      opts.amount,
       { token: opts.token, unit: asUnit },
       json,
     ).catch((error: Error) => error);
@@ -379,7 +365,7 @@ const setBudget = zodCommand({
           ["Tx", pc.cyan(result.txHash)],
         ]),
         "",
-        pc.dim(`Next: the client escrows it — hrld agent job fund ${result.jobId}`),
+        pc.dim(`Next: the client agrees to it — alln agent job agree ${result.jobId}`),
       ].join("\n"),
       result,
     )(json);
@@ -387,15 +373,14 @@ const setBudget = zodCommand({
 });
 
 async function setJobBudget(
-  chain: EvmChain,
   jobId: string,
   budget: string,
-  opts: { token?: string; unit: boolean },
+  opts: { token: string; unit: boolean },
   json: boolean,
 ) {
-  const token = resolveToken(chain, opts.token);
-  const allowed = await publicClient(chain).readContract({
-    address: agenticCommerceByChain[chain],
+  const token = resolveToken(opts.token);
+  const allowed = await publicClient().readContract({
+    address: AGENTIC_COMMERCE,
     abi: erc8183AgenticCommerceAbi,
     functionName: "allowedPaymentTokens",
     args: [token],
@@ -407,7 +392,7 @@ async function setJobBudget(
       "Pass a whitelisted token with --token <address>.",
     );
 
-  const metadata = await readTokenMetadata(chain, token);
+  const metadata = await readTokenMetadata(token);
   if (!opts.unit && !metadata)
     throw new CliError(
       "JOB_ACTION_FAILED",
@@ -417,18 +402,17 @@ async function setJobBudget(
   const amount = parseTokenAmount(budget, opts.unit, metadata?.decimals ?? 0, "JOB_INPUT_INVALID");
 
   progress(json, `Setting budget on job #${jobId}…`);
-  const txHash = await walletClient(chain, await openSession())
+  const txHash = await walletClient(await openSession())
     .writeContract({
-      address: agenticCommerceByChain[chain],
+      address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "setBudget",
       args: [requireJobId(jobId), token, amount, "0x"],
     })
     .catch(rethrowRevert("set the budget"));
-  await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  await publicClient().waitForTransactionReceipt({ hash: txHash });
 
   return {
-    chain,
     jobId,
     token,
     symbol: metadata?.symbol ?? null,
@@ -438,23 +422,22 @@ async function setJobBudget(
   };
 }
 
-function resolveToken(chain: EvmChain, token: string | undefined): Address {
-  if (token === undefined) return WRAPPED_NATIVE_TOKEN[chain];
+function resolveToken(token: string): Address {
   if (!isAddress(token))
     throw new CliError("JOB_INPUT_INVALID", `${token} is not a token address.`);
   return token;
 }
 
-const fund = zodCommand({
-  name: "fund",
-  description: "Escrow a job's budget as its client",
+const agree = zodCommand({
+  name: "agree",
+  description: "Agree to a job's price as its client, escrowing the budget",
   args: {
     jobId: z.string().describe("Onchain job id"),
   },
   action: async (args) => {
-    const json = isJson(fund);
+    const json = isJson(agree);
 
-    const result = await fundJob(activeChain, args.jobId, json).catch((error: Error) => error);
+    const result = await agreeJob(args.jobId, json).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -470,54 +453,53 @@ const fund = zodCommand({
           ["Fund Tx", pc.cyan(result.txHash)],
         ]),
         "",
-        pc.dim("Next: the provider works and delivers — hrld agent job deliver <jobId> <fileHash>"),
+        pc.dim("Next: the provider works and delivers — alln agent job deliver <jobId> <fileHash>"),
       ].join("\n"),
       result,
     )(json);
   },
 });
 
-async function fundJob(chain: EvmChain, jobId: string, json: boolean) {
+async function agreeJob(jobId: string, json: boolean) {
   const id = requireJobId(jobId);
-  const job = await readJob(chain, id);
+  const job = await readJob(id);
   if (jobStatuses[job.status] !== "OPEN")
     throw new CliError(
       "JOB_ACTION_FAILED",
-      `Job #${jobId} is ${jobStatuses[job.status]}; only open jobs can be funded.`,
+      `Job #${jobId} is ${jobStatuses[job.status]}; only open jobs can be agreed to.`,
     );
   if (job.budget === 0n)
     throw new CliError(
       "JOB_ACTION_FAILED",
       `Job #${jobId} has no budget yet.`,
-      `The provider sets it first: hrld agent job set-budget ${jobId} <budget>`,
+      `The provider sets it first: alln agent job set-budget ${jobId} --token <address> --amount <amount>`,
     );
 
   const session = await openSession();
-  const wallet = requireWallet(session, chain);
-  const escrow = agenticCommerceByChain[chain];
+  const wallet = requireWallet(session);
+  const escrow = AGENTIC_COMMERCE;
   const metadata =
-    job.paymentToken === zeroAddress ? null : await readTokenMetadata(chain, job.paymentToken);
+    job.paymentToken === zeroAddress ? null : await readTokenMetadata(job.paymentToken);
 
-  // The escrow pulls ERC-20 budgets via transferFrom, so the client must hold
+  // The escrow pulls TIP-20 budgets via transferFrom, so the client must hold
   // and approve the amount before fund() can succeed.
   const approveTxHash =
     job.paymentToken === zeroAddress
       ? null
-      : await approveBudget(chain, session, wallet, job.paymentToken, job.budget, metadata, json);
+      : await approveBudget(session, wallet, job.paymentToken, job.budget, metadata, json);
 
   progress(json, `Funding job #${jobId} with ${formatTokenAmount(job.budget, metadata)}…`);
-  const txHash = await walletClient(chain, session, wallet)
+  const txHash = await walletClient(session, wallet)
     .writeContract({
       address: escrow,
       abi: erc8183AgenticCommerceAbi,
       functionName: "fund",
       args: [id, job.paymentToken, job.budget, "0x"],
     })
-    .catch(rethrowRevert("fund the job"));
-  await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+    .catch(rethrowRevert("agree to the job"));
+  await publicClient().waitForTransactionReceipt({ hash: txHash });
 
   return {
-    chain,
     jobId,
     token: job.paymentToken,
     symbol: metadata?.symbol ?? null,
@@ -529,7 +511,6 @@ async function fundJob(chain: EvmChain, jobId: string, json: boolean) {
 }
 
 async function approveBudget(
-  chain: EvmChain,
   session: WalletSession,
   wallet: Wallet,
   token: Address,
@@ -537,18 +518,18 @@ async function approveBudget(
   metadata: TokenMetadata | null,
   json: boolean,
 ) {
-  const escrow = agenticCommerceByChain[chain];
+  const escrow = AGENTIC_COMMERCE;
   const address = wallet.address as Address;
   const [balance, allowance] = await Promise.all([
-    publicClient(chain).readContract({
+    publicClient().readContract({
       address: token,
-      abi: erc20Abi,
+      abi: Abis.tip20,
       functionName: "balanceOf",
       args: [address],
     }),
-    publicClient(chain).readContract({
+    publicClient().readContract({
       address: token,
-      abi: erc20Abi,
+      abi: Abis.tip20,
       functionName: "allowance",
       args: [address, escrow],
     }),
@@ -557,22 +538,19 @@ async function approveBudget(
     throw new CliError(
       "JOB_ACTION_FAILED",
       `This wallet holds ${formatTokenAmount(balance, metadata)} but the budget is ${formatTokenAmount(budget, metadata)}.`,
-      metadata?.symbol === "W0G"
-        ? "Wrap more native tokens with `hrld wallet evm wrap <amount>`."
-        : undefined,
     );
   if (allowance >= budget) return null;
 
   progress(json, `Approving ${formatTokenAmount(budget, metadata)} for the escrow…`);
-  const txHash = await walletClient(chain, session, wallet)
+  const txHash = await walletClient(session, wallet)
     .writeContract({
       address: token,
-      abi: erc20Abi,
+      abi: Abis.tip20,
       functionName: "approve",
       args: [escrow, budget],
     })
     .catch(rethrowRevert("approve the budget"));
-  await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  await publicClient().waitForTransactionReceipt({ hash: txHash });
   return txHash;
 }
 
@@ -581,14 +559,12 @@ const deliver = zodCommand({
   description: "Submit a deliverable for a funded job as its provider",
   args: {
     jobId: z.string().describe("Onchain job id"),
-    fileHash: z.string().describe("Root hash of the uploaded deliverable (hrld storage upload)"),
+    fileHash: z.string().describe("32-byte content hash committing to the deliverable"),
   },
   action: async (args) => {
     const json = isJson(deliver);
 
-    const result = await deliverJob(activeChain, args.jobId, args.fileHash, json).catch(
-      (error: Error) => error,
-    );
+    const result = await deliverJob(args.jobId, args.fileHash, json).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -601,7 +577,7 @@ const deliver = zodCommand({
         ]),
         "",
         pc.dim(
-          `Next: the client evaluates it — hrld agent job complete ${result.jobId} (or reject)`,
+          `Next: the client evaluates it — alln agent job complete ${result.jobId} (or reject)`,
         ),
       ].join("\n"),
       result,
@@ -609,26 +585,26 @@ const deliver = zodCommand({
   },
 });
 
-async function deliverJob(chain: EvmChain, jobId: string, fileHash: string, json: boolean) {
+async function deliverJob(jobId: string, fileHash: string, json: boolean) {
   if (!/^0x[0-9a-fA-F]{64}$/.test(fileHash))
     throw new CliError(
       "JOB_INPUT_INVALID",
       `${fileHash} is not a 32-byte hash.`,
-      "Upload the deliverable with `hrld storage upload <path>` and pass its Root Hash.",
+      "Pass the 32-byte content hash of the deliverable, e.g. its merkle root.",
     );
 
   progress(json, `Submitting deliverable for job #${jobId}…`);
-  const txHash = await walletClient(chain, await openSession())
+  const txHash = await walletClient(await openSession())
     .writeContract({
-      address: agenticCommerceByChain[chain],
+      address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "submit",
       args: [requireJobId(jobId), fileHash as `0x${string}`, "0x"],
     })
     .catch(rethrowRevert("submit the deliverable"));
-  await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  await publicClient().waitForTransactionReceipt({ hash: txHash });
 
-  return { chain, jobId, deliverable: fileHash, txHash };
+  return { jobId, deliverable: fileHash, txHash };
 }
 
 const complete = zodCommand({
@@ -643,7 +619,7 @@ const complete = zodCommand({
   action: async (args, opts) => {
     const json = isJson(complete);
 
-    const result = await evaluateJob(activeChain, "complete", args.jobId, opts.reason, json).catch(
+    const result = await evaluateJob("complete", args.jobId, opts.reason, json).catch(
       (error: Error) => error,
     );
     if (result instanceof Error) return err(result)(json);
@@ -676,7 +652,7 @@ const reject = zodCommand({
   action: async (args, opts) => {
     const json = isJson(reject);
 
-    const result = await evaluateJob(activeChain, "reject", args.jobId, opts.reason, json).catch(
+    const result = await evaluateJob("reject", args.jobId, opts.reason, json).catch(
       (error: Error) => error,
     );
     if (result instanceof Error) return err(result)(json);
@@ -698,24 +674,23 @@ const reject = zodCommand({
 });
 
 async function evaluateJob(
-  chain: EvmChain,
   action: "complete" | "reject",
   jobId: string,
   reason: string | undefined,
   json: boolean,
 ) {
   progress(json, `Marking job #${jobId} as ${action === "complete" ? "completed" : "rejected"}…`);
-  const txHash = await walletClient(chain, await openSession())
+  const txHash = await walletClient(await openSession())
     .writeContract({
-      address: agenticCommerceByChain[chain],
+      address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: action,
       args: [requireJobId(jobId), toReason(reason), "0x"],
     })
     .catch(rethrowRevert(`${action} the job`));
-  await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  await publicClient().waitForTransactionReceipt({ hash: txHash });
 
-  return { chain, jobId, action, reason: reason ?? null, txHash };
+  return { jobId, action, reason: reason ?? null, txHash };
 }
 
 function toReason(reason: string | undefined): `0x${string}` {
@@ -738,7 +713,7 @@ const refund = zodCommand({
   action: async (args) => {
     const json = isJson(refund);
 
-    const result = await refundJob(activeChain, args.jobId, json).catch((error: Error) => error);
+    const result = await refundJob(args.jobId, json).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -755,9 +730,9 @@ const refund = zodCommand({
   },
 });
 
-async function refundJob(chain: EvmChain, jobId: string, json: boolean) {
+async function refundJob(jobId: string, json: boolean) {
   const id = requireJobId(jobId);
-  const job = await readJob(chain, id);
+  const job = await readJob(id);
   const status = jobStatuses[job.status];
   if (status !== "FUNDED" && status !== "SUBMITTED")
     throw new CliError(
@@ -766,21 +741,20 @@ async function refundJob(chain: EvmChain, jobId: string, json: boolean) {
     );
 
   const metadata =
-    job.paymentToken === zeroAddress ? null : await readTokenMetadata(chain, job.paymentToken);
+    job.paymentToken === zeroAddress ? null : await readTokenMetadata(job.paymentToken);
 
   progress(json, `Claiming refund for job #${jobId}…`);
-  const txHash = await walletClient(chain, await openSession())
+  const txHash = await walletClient(await openSession())
     .writeContract({
-      address: agenticCommerceByChain[chain],
+      address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "claimRefund",
       args: [id],
     })
     .catch(rethrowRevert("claim the refund"));
-  await publicClient(chain).waitForTransactionReceipt({ hash: txHash });
+  await publicClient().waitForTransactionReceipt({ hash: txHash });
 
   return {
-    chain,
     jobId,
     amount: job.budget.toString(),
     budget: formatTokenAmount(job.budget, metadata),
@@ -794,9 +768,9 @@ function requireJobId(value: string): bigint {
   return BigInt(value);
 }
 
-async function readJob(chain: EvmChain, jobId: bigint) {
-  const job = await publicClient(chain).readContract({
-    address: agenticCommerceByChain[chain],
+async function readJob(jobId: bigint) {
+  const job = await publicClient().readContract({
+    address: AGENTIC_COMMERCE,
     abi: erc8183AgenticCommerceAbi,
     functionName: "getJob",
     args: [jobId],
@@ -805,24 +779,20 @@ async function readJob(chain: EvmChain, jobId: bigint) {
     throw new CliError(
       "JOB_NOT_FOUND",
       `No onchain job with id ${jobId}.`,
-      "Run `hrld agent job list` to see this account's jobs.",
+      "Run `alln agent job list` to see this account's jobs.",
     );
 
   return job;
 }
 
-function publicClient(chain: EvmChain) {
-  return createPublicClient({ chain: viemChainByChain[chain], transport: http() });
+function publicClient() {
+  return createPublicClient({ chain: tempo, transport: http() });
 }
 
-function walletClient(
-  chain: EvmChain,
-  session: WalletSession,
-  wallet: Wallet = requireWallet(session, chain),
-) {
+function walletClient(session: WalletSession, wallet: Wallet = requireWallet(session)) {
   return createWalletClient({
     account: toWalletAccount(session, wallet),
-    chain: viemChainByChain[chain],
+    chain: tempo,
     transport: http(),
   });
 }
@@ -868,7 +838,7 @@ export const job = zodCommand({
   .addCommand(list)
   .addCommand(create)
   .addCommand(setBudget)
-  .addCommand(fund)
+  .addCommand(agree)
   .addCommand(deliver)
   .addCommand(complete)
   .addCommand(reject)

@@ -1,9 +1,8 @@
 {
-  "name": "@hrld/cli",
+  "name": "@allegretto-network/cli",
   "version": "0.1.2",
-  "description": "Herald CLI — Agent Commerce Protocol tools to discover, negotiate, hire, transact and pay with another agents",
+  "description": "Allegretto Network CLI — Agent Commerce Protocol tools to discover, negotiate, hire, transact and pay with another agents",
   "keywords": [
-    "0g",
     "agent-commerce",
     "agentic-commerce",
     "agents",
@@ -11,11 +10,12 @@
     "cli",
     "escrow",
     "onchain",
+    "tempo",
     "x402"
   ],
-  "homepage": "https://github.com/0verlabs/herald#readme",
+  "homepage": "https://github.com/allegretto-network/allegretto#readme",
   "bugs": {
-    "url": "https://github.com/0verlabs/herald/issues"
+    "url": "https://github.com/allegretto-network/allegretto/issues"
   },
   "license": "MIT",
   "author": {
@@ -25,11 +25,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0verlabs/herald.git",
+    "url": "git+https://github.com/allegretto-network/allegretto.git",
     "directory": "apps/cli"
   },
   "bin": {
-    "hrld": "./dist/cli.mjs"
+    "alln": "./dist/cli.mjs"
   },
   "files": [
     "dist"
@@ -46,13 +46,11 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@0gfoundation/0g-storage-ts-sdk": "catalog:",
     "@hpke/chacha20poly1305": "catalog:",
     "@hpke/core": "catalog:",
     "canonicalize": "catalog:",
     "commander": "catalog:",
     "cross-keychain": "catalog:",
-    "ethers": "catalog:",
     "flat-cache": "catalog:",
     "hono": "catalog:",
     "picocolors": "catalog:",
@@ -63,8 +61,8 @@
     "zod-commander": "catalog:"
   },
   "devDependencies": {
-    "@hrld/api": "workspace:*",
-    "@hrld/core": "workspace:*",
+    "@allegretto-network/api": "workspace:*",
+    "@allegretto-network/core": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

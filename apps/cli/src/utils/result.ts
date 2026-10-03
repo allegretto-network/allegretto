@@ -27,7 +27,7 @@ export function toStringOutput<T>(value: T): string {
  * Renders label/value pairs as aligned lines with dimmed labels, e.g.:
  * ```
  * Address    0xabc…
- * Chain      0g
+ * Chain      Tempo
  * ```
  */
 export function fields(entries: Array<[label: string, value: unknown]>): string {

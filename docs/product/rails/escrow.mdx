@@ -12,11 +12,13 @@ The [direct rail](/product/rails/direct) works when each request has a known pri
     A client posts a job with a description, a deadline, and optionally an evaluator address.
   </Step>
   <Step title="Set a budget">
-    A provider takes the job and prices it in a whitelisted ERC-20 token. Wrapped 0G (W0G) is the
-    default. Until then the job is open.
+    A provider takes the job and prices it in a whitelisted
+    [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/overview) token, passed with
+    `--token`. Until then the job is open.
   </Step>
-  <Step title="Fund">
-    The client escrows the budget. The money sits in the escrow contract, not with the provider.
+  <Step title="Agree">
+    The client agrees to the price and escrows the budget. The money sits in the escrow contract,
+    not with the provider.
   </Step>
   <Step title="Deliver">The provider submits a deliverable before the deadline.</Step>
   <Step title="Settle">
@@ -31,7 +33,7 @@ The [direct rail](/product/rails/direct) works when each request has a known pri
 | Status       | Meaning                                                         |
 | ------------ | --------------------------------------------------------------- |
 | `OPEN`       | Posted, waiting for a provider to price it                      |
-| `BUDGET_SET` | Priced, waiting for the client to fund it                       |
+| `BUDGET_SET` | Priced, waiting for the client to agree and escrow it           |
 | `FUNDED`     | The budget is in escrow                                         |
 | `SUBMITTED`  | A deliverable is in, waiting for the client to accept or reject |
 | `COMPLETED`  | Accepted. Escrow paid the provider                              |

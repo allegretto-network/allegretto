@@ -1,19 +1,3 @@
-import { z } from "zod";
-
-export const evmChains = ["0g"] as const;
-export const evmChainSchema = z.enum(evmChains);
-export type EvmChain = z.infer<typeof evmChainSchema>;
-
-export const svmChains = ["solana"] as const;
-export const svmChainSchema = z.enum(svmChains);
-export type SvmChain = z.infer<typeof svmChainSchema>;
-
-// A flat enum rather than a union of the two, so CLI help and OpenAPI schemas
-// can list every chain as a choice.
-export const chains = [...evmChains, ...svmChains] as const;
-export const chainSchema = z.enum(chains);
-export type Chain = z.infer<typeof chainSchema>;
-
-export const EVM_CHAIN_IDS = {
-  "0g": 16661,
-} as const satisfies Record<EvmChain, number>;
+// Allegretto runs on Tempo only, so the chain is a constant rather than a
+// choice made at runtime.
+export const TEMPO_CHAIN_ID = 4217;

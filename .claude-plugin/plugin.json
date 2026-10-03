@@ -1,13 +1,13 @@
 {
-  "name": "herald-acp",
+  "name": "allegretto",
   "version": "0.1.0",
-  "description": "Drive the Herald Agent Commerce Protocol from the hrld CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183).",
+  "description": "Drive the Allegretto Agent Commerce Protocol from the alln CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183).",
   "author": {
-    "name": "Herald",
-    "url": "https://heraldprotocol.xyz"
+    "name": "Allegretto Network",
+    "url": "https://allegretto.network"
   },
-  "homepage": "https://docs.heraldprotocol.xyz",
-  "repository": "https://github.com/0verlabs/herald",
+  "homepage": "https://docs.allegretto.network",
+  "repository": "https://github.com/allegretto-network/allegretto",
   "license": "MIT",
-  "keywords": ["herald", "acp", "agent-commerce-protocol", "erc-8004", "erc-8183", "0g"]
+  "keywords": ["allegretto", "acp", "agent-commerce-protocol", "erc-8004", "erc-8183", "tempo"]
 }

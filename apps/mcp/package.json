@@ -1,5 +1,5 @@
 {
-  "name": "@hrld/mcp",
+  "name": "@allegretto-network/mcp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,9 @@
     "preview": "vp preview"
   },
   "dependencies": {
+    "@allegretto-network/api": "workspace:*",
+    "@allegretto-network/utils": "workspace:*",
     "@hono/mcp": "catalog:",
-    "@hrld/api": "workspace:*",
-    "@hrld/utils": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"

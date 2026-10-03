@@ -1,6 +1,7 @@
-import { type EvmChain, viemChainByChain } from "@hrld/core";
 import pc from "picocolors";
-import { type Address, createPublicClient, erc20Abi, formatUnits, http, parseUnits } from "viem";
+import { type Address, createPublicClient, formatUnits, http, parseUnits } from "viem";
+import { tempo } from "viem/chains";
+import { Abis } from "viem/tempo";
 import type { ErrorCode } from "../utils/errors.ts";
 import { CliError } from "../utils/errors.ts";
 import { getCached, setCached } from "./cache.ts";
@@ -8,21 +9,17 @@ import { getCached, setCached } from "./cache.ts";
 export type TokenMetadata = { decimals: number; symbol: string };
 
 /**
- * Reads a token's decimals and symbol, cached forever per chain and address
- * since both are immutable for a deployed contract. Returns null when the
- * contract does not answer (not an ERC-20, wrong chain), so callers can fall
- * back to raw base units.
+ * Reads a token's decimals and symbol, cached forever per address since both
+ * are immutable for a deployed contract. Returns null when the contract does
+ * not answer (not a TIP-20), so callers can fall back to raw base units.
  */
-export async function readTokenMetadata(
-  chain: EvmChain,
-  token: Address,
-): Promise<TokenMetadata | null> {
-  const key = `${chain}:${token.toLowerCase()}`;
+export async function readTokenMetadata(token: Address): Promise<TokenMetadata | null> {
+  const key = token.toLowerCase();
   const cached = getCached<TokenMetadata>("token-metadata", key);
   if (cached) return cached;
 
-  const client = createPublicClient({ chain: viemChainByChain[chain], transport: http() });
-  const contract = { address: token, abi: erc20Abi } as const;
+  const client = createPublicClient({ chain: tempo, transport: http() });
+  const contract = { address: token, abi: Abis.tip20 } as const;
   const metadata = await Promise.all([
     client.readContract({ ...contract, functionName: "decimals" }),
     client.readContract({ ...contract, functionName: "symbol" }),
@@ -34,13 +31,13 @@ export async function readTokenMetadata(
   return metadata;
 }
 
-/** "0.05 W0G" when metadata is known, "50000000000000000 base units" when not. */
+/** "0.05 USDC" when metadata is known, "50000000000000000 base units" when not. */
 export function formatTokenAmount(amount: bigint, metadata: TokenMetadata | null): string {
   if (!metadata) return `${amount} base units`;
   return `${formatUnits(amount, metadata.decimals)} ${metadata.symbol}`;
 }
 
-/** "W0G (0x...)" when a symbol is known, else just the address. */
+/** "USDC (0x...)" when a symbol is known, else just the address. */
 export function tokenLabel(token: string, symbol: string | null): string {
   return symbol ? `${symbol} ${pc.dim(`(${token})`)}` : token;
 }

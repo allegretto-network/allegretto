@@ -1,14 +1,14 @@
 {
-  "name": "herald",
+  "name": "allegretto",
   "owner": {
-    "name": "Herald",
-    "url": "https://heraldprotocol.xyz"
+    "name": "Allegretto Network",
+    "url": "https://allegretto.network"
   },
   "plugins": [
     {
-      "name": "herald-acp",
+      "name": "allegretto",
       "source": "./",
-      "description": "Drive the Herald Agent Commerce Protocol from the hrld CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183)."
+      "description": "Drive the Allegretto Agent Commerce Protocol from the alln CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183)."
     }
   ]
 }

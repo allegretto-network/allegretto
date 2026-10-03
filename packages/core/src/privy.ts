@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { Network } from "./network";
 import type { Wallet } from "./wallet";
 
 // Public client identifier; the app secret never ships with clients.
@@ -13,36 +12,24 @@ export const PRIVY_AUTH_ORIGIN = "https://auth.privy.io";
 export const PRIVY_OAUTH_PATH = "/api/oauth/v2";
 export const PRIVY_GRANT_TYPE_DEVICE_CODE = "device_code";
 
-// Privy issues one embedded wallet per chain type, which is its name for what
-// Herald calls a network.
-export const privyChainTypes = ["ethereum", "solana"] as const;
-export const privyChainTypeSchema = z.enum(privyChainTypes);
-export type PrivyChainType = z.infer<typeof privyChainTypeSchema>;
-
-export const networkByPrivyChainType = {
-  ethereum: "evm",
-  solana: "svm",
-} as const satisfies Record<PrivyChainType, Network>;
-
 export const privyWalletSchema = z.object({
   id: z.string(),
   address: z.string(),
-  // Privy supports chain types Herald does not model, so this stays a plain
-  // string and unsupported wallets drop out during mapping.
+  // Privy issues one embedded wallet per chain type and supports chains
+  // Allegretto does not, so this stays a plain string and unsupported wallets
+  // drop out during mapping.
   chain_type: z.string(),
 });
 
 export type PrivyWallet = z.infer<typeof privyWalletSchema>;
 
-// Returns null for chain types outside Herald's domain, such as Privy's Tron or
-// XRPL wallets.
-export function toWallet(wallet: PrivyWallet): Wallet | null {
-  const chainType = privyChainTypeSchema.safeParse(wallet.chain_type);
-  if (!chainType.success) return null;
+// Allegretto is EVM-only, so it uses the ethereum wallet and ignores the rest.
+const EVM_CHAIN_TYPE = "ethereum";
 
-  return {
-    id: wallet.id,
-    address: wallet.address,
-    network: networkByPrivyChainType[chainType.data],
-  };
+// Returns null for wallets on any chain type but Ethereum, such as Privy's
+// Solana, Tron, or XRPL wallets.
+export function toWallet(wallet: PrivyWallet): Wallet | null {
+  if (wallet.chain_type !== EVM_CHAIN_TYPE) return null;
+
+  return { id: wallet.id, address: wallet.address };
 }
