@@ -20,17 +20,14 @@
       "sameAs": ["https://x.com/allegretto_network", "https://github.com/allegretto-network"]
     }
   },
-  "thumbnails": {
-    "background": "/images/og-background.png"
-  },
   "colors": {
-    "primary": "#7f7fc2",
-    "light": "#7f7fc2"
+    "primary": "#d4af37",
+    "light": "#d4af37"
   },
   "favicon": "/favicon.svg",
   "fonts": {
     "heading": {
-      "family": "Lora"
+      "family": "Josefin Slab"
     },
     "body": {
       "family": "Figtree"
