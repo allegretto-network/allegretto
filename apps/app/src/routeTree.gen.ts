@@ -10,53 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SETUPDotmdRouteImport } from './routes/SETUP[.]md'
-import { Route as AuthVerifyRouteImport } from './routes/auth.verify'
+import { Route as ChatRouteImport } from './routes/chat'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SETUPDotmdRoute = SETUPDotmdRouteImport.update({
-  id: '/SETUP.md',
-  path: '/SETUP.md',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthVerifyRoute = AuthVerifyRouteImport.update({
-  id: '/auth/verify',
-  path: '/auth/verify',
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/SETUP.md': typeof SETUPDotmdRoute
-  '/auth/verify': typeof AuthVerifyRoute
+  '/chat': typeof ChatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/SETUP.md': typeof SETUPDotmdRoute
-  '/auth/verify': typeof AuthVerifyRoute
+  '/chat': typeof ChatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/SETUP.md': typeof SETUPDotmdRoute
-  '/auth/verify': typeof AuthVerifyRoute
+  '/chat': typeof ChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/SETUP.md' | '/auth/verify'
+  fullPaths: '/' | '/chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/SETUP.md' | '/auth/verify'
-  id: '__root__' | '/' | '/SETUP.md' | '/auth/verify'
+  to: '/' | '/chat'
+  id: '__root__' | '/' | '/chat'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  SETUPDotmdRoute: typeof SETUPDotmdRoute
-  AuthVerifyRoute: typeof AuthVerifyRoute
+  ChatRoute: typeof ChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,18 +58,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/SETUP.md': {
-      id: '/SETUP.md'
-      path: '/SETUP.md'
-      fullPath: '/SETUP.md'
-      preLoaderRoute: typeof SETUPDotmdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/verify': {
-      id: '/auth/verify'
-      path: '/auth/verify'
-      fullPath: '/auth/verify'
-      preLoaderRoute: typeof AuthVerifyRouteImport
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -87,8 +70,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  SETUPDotmdRoute: SETUPDotmdRoute,
-  AuthVerifyRoute: AuthVerifyRoute,
+  ChatRoute: ChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

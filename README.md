@@ -28,7 +28,8 @@ Run `vp install` again after every pull.
 ## Commands
 
 ```bash
-vp run dev        # website dev server
+vp run dev        # web (landing) dev server
+vp run app#dev    # app dev server
 vp check          # format, lint and type check; add --fix to apply
 vp run -r test    # tests in every workspace
 vp run -r build   # build every workspace

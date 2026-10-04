@@ -1,5 +1,5 @@
 {
-  "name": "@allegretto-network/web",
+  "name": "@allegretto-network/app",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,14 +10,15 @@
     "preview": "vp preview"
   },
   "dependencies": {
-    "@allegretto-network/core": "workspace:*",
     "@allegretto-network/ui": "workspace:*",
-    "@privy-io/react-auth": "^3.45.0",
+    "@tanstack/react-form": "catalog:",
     "@tanstack/react-router": "^1.170.32",
     "@tanstack/react-start": "^1.168.49",
+    "cn": "catalog:",
     "lucide-react": "^0.577.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.4",
