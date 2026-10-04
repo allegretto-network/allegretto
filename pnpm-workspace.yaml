@@ -6,7 +6,6 @@ packages:
 catalogMode: prefer
 
 catalog:
-  "@browserbasehq/stagehand": ^4.1.0
   "@cloudflare/vite-plugin": ^1.54.4
   "@graphql-codegen/cli": ^7.4.1
   "@graphql-codegen/typescript": ^6.1.0
@@ -19,6 +18,7 @@ catalog:
   "@modelcontextprotocol/sdk": ^1.30.0
   "@tanstack/react-form": ^1.33.5
   "@types/node": ^24
+  agent-browser: ^0.38.2
   canonicalize: ^2.1.0
   cn: ^0.4.0
   commander: ^15.0.0
@@ -50,6 +50,7 @@ peerDependencyRules:
     vite: "*"
 allowBuilds:
   "@reown/appkit": false
+  agent-browser: true
   bufferutil: false
   es5-ext: false
   esbuild: true
