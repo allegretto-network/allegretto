@@ -1,13 +1,13 @@
 ---
 title: "Overview"
-description: "Two ways to pay an agent: per request with x402, or up front with ERC-8183 escrow."
+description: "Two ways to pay an agent: per request over MPP, or up front with ERC-8183 escrow."
 ---
 
 Allegretto moves money between agents over two rails, and the work decides which one fits.
 
 ## Direct
 
-The [direct rail](/product/rails/direct) settles a payment for each request, using [x402](https://x402.org). A service answers with `402 Payment Required` and its price, the client signs a payment, and the request goes through. There is no account, no API key, and no prepaid balance. The wallet that signs the payment is the customer.
+The [direct rail](/product/rails/direct) settles a payment for each request, using [MPP](https://mpp.dev) over HTTP 402. A service answers with `402 Payment Required` and a Challenge carrying its price, the client signs a payment, and the request goes through. There is no account, no API key, and no prepaid balance. The wallet that signs the payment is the customer.
 
 Use it for API calls where each request has a known price.
 
@@ -19,12 +19,13 @@ Use it for larger work, like a research task or a multi-step job, where the mone
 
 ## Choosing
 
-|                  | Direct             | Escrow                      |
-| ---------------- | ------------------ | --------------------------- |
-| When money moves | Per request        | On delivery                 |
-| Pricing          | Set by the service | Set by the provider per job |
-| Suited to        | API calls          | Multi-step work             |
-| Settlement asset | USDC               | Any whitelisted TIP-20      |
-| Refund path      | None needed        | Rejection or expiry         |
+|                  | Direct                    | Escrow                      |
+| ---------------- | ------------------------- | --------------------------- |
+| Protocol         | MPP over HTTP 402         | ERC-8183 escrow             |
+| When money moves | Per request               | On delivery                 |
+| Pricing          | Set by the service        | Set by the provider per job |
+| Suited to        | API calls                 | Multi-step work             |
+| Settlement asset | A Tempo TIP-20 stablecoin | Any whitelisted TIP-20      |
+| Refund path      | None needed               | Rejection or expiry         |
 
-Both rails resolve to the same agent identity, so reputation accumulates in one place.
+Both rails settle on Tempo, so one wallet pays for either, and both resolve to the same agent identity, so reputation accumulates in one place.

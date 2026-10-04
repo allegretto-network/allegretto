@@ -1,33 +1,40 @@
 ---
 title: "Direct"
-description: "Settle a payment for each request with x402. No account, no API key."
+description: "Settle a payment for each request over MPP on Tempo. No account, no API key."
 ---
 
-The direct rail settles a payment for each request, using [x402](https://x402.org). There is no account, no API key, and no prepaid balance. The wallet that signs the payment is the customer.
+The direct rail settles a payment for each request, using [MPP](https://mpp.dev) — the Machine Payments Protocol, an open standard for HTTP 402 payments — settling on [Tempo](https://tempo.xyz). There is no account, no API key, and no prepaid balance. The wallet that signs the payment is the customer.
 
 ## How a payment works
 
 <Steps>
   <Step title="Request without payment">
     The client calls the service like any HTTP API. The service responds with status `402 Payment
-    Required` and a `payment-required` header listing the asset (USDC), the recipient, and the
-    maximum amount.
+    Required` and a Challenge in the `WWW-Authenticate` header naming the amount, the TIP-20
+    stablecoin, the recipient, and the payment method it accepts.
   </Step>
   <Step title="Sign">
-    The client signs a payment authorization with its wallet. With the `upto` scheme, you authorize
-    a maximum amount and the service settles only what the request actually cost.
+    The client signs the payment with its wallet. A Tempo charge is a signed TIP-20 transfer bound
+    to the Challenge, so the amount and recipient cannot be changed after the service issued it.
   </Step>
   <Step title="Retry">
-    The client resends the request with the signed payment attached as a header. The service
-    verifies it, serves the response, and settles on-chain.
+    The client resends the request with a Credential carrying that proof. The service verifies it,
+    serves the response, and settles on Tempo. The response carries a `Payment-Receipt` header as
+    proof of payment.
   </Step>
 </Steps>
 
-Client libraries handle this loop for you. `wrapFetchWithPayment` from `@x402/fetch` wraps the standard `fetch`, so your code only sees the final response.
+Client libraries handle this loop for you. [`mppx`](https://mpp.dev/sdk/typescript) wraps the standard `fetch`, so your code only sees the final response.
 
-Payments settle in USDC. The facilitator sponsors gas for the transaction and/or Permit2 approval, so a wallet that holds only USDC can pay without holding anything for gas separately.
+## Metered work
+
+A charge settles once per request. An API that meters usage, like an LLM endpoint billed per token, should not settle on chain every time, so MPP's `session` intent opens a payment channel instead. The client funds the channel once, the service issues off-chain vouchers as it serves, and the channel settles on Tempo periodically. Requests add no on-chain latency, and one settlement covers the whole session.
 
 Jobs that need the budget committed up front go through the [escrow rail](/product/rails/escrow) instead.
+
+## Settlement
+
+Payments settle in Tempo stablecoins, which are [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/overview) tokens. The service picks which one it accepts and names it in the Challenge, so a client never has to guess. Tempo has no native token, settles with deterministic finality in roughly 500ms, and lets the service sponsor the transaction fee, so a wallet holding only the stablecoin it pays with needs nothing else.
 
 ## Supported chains
 

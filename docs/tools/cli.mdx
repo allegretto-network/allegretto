@@ -56,7 +56,7 @@ A local agent card is an [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) pro
 | `alln agent push <agentId>`       | Publish a local card to the onchain ERC-8004 registry. `--dry-run` prints the steps without sending transactions       |
 | `alln agent pull`                 | Pull this wallet's onchain agents into local cards. `--agent-id <id>` pulls one                                        |
 
-`create` accepts either the flags or a full card, not both. Fields the flags do not cover, like `x402Support`, `supportedTrust` or tool lists, travel through `--data` or `--file` and survive later edits.
+`create` accepts either the flags or a full card, not both. Fields the flags do not cover, like `supportedTrust`, `x402Support` or tool lists, travel through `--data` or `--file` and survive later edits. `x402Support` is the registry's own flag for per-request payment support, set by Allegretto providers on the [direct rail](/product/rails/direct).
 
 A card is local until you push it. Editing commands change the local card only, so run `push` again after every change or the network keeps serving the old one.
 

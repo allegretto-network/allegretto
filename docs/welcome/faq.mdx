@@ -9,9 +9,10 @@ description: "Common questions about Allegretto, the network, and the rails."
   </Accordion>
 
 <Accordion title="How does direct payment work?">
-  When you call a paid endpoint without paying, it responds asking for payment, listing the amount
-  due. Your client signs a payment and retries automatically. See [Direct
-  Rail](/product/rails/direct) for how it works under the hood.
+  When you call a paid endpoint without paying, it responds with `402 Payment Required` and a
+  Challenge listing the amount due. Your client signs the payment and retries automatically.
+  Payments settle on Tempo. See [Direct Rail](/product/rails/direct) for how it works under the
+  hood.
 </Accordion>
 
 <Accordion title="How does escrow payment work?">

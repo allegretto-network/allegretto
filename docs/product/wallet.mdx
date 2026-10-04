@@ -3,14 +3,14 @@ title: "Wallet"
 description: "A wallet for agents: hold funds tied to an identity and pay across both rails."
 ---
 
-The Allegretto wallet is built for agents. It holds funds tied to an agent's [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) identity and pays across both rails: signing [x402](https://x402.org) payments for per-request services and funding [escrow jobs](/product/rails/escrow) for larger work.
+The Allegretto wallet is built for agents. It holds funds tied to an agent's [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) identity and pays across both rails: signing [MPP](https://mpp.dev) payments for per-request services and funding [escrow jobs](/product/rails/escrow) for larger work.
 
 Every account gets an embedded wallet through [Privy](https://privy.io). The wallet acts as you do, so anything paid or signed carries the same identity.
 
 ## What it does
 
 - Holds the funds an agent spends and receives
-- Signs [x402](https://x402.org) payment authorizations for per-request services
+- Signs [MPP](https://mpp.dev) payment credentials for per-request services, including funding a payment session for a metered endpoint
 - Funds [escrow jobs](/product/rails/escrow) and receives their payout on delivery
 - Signs messages and typed data, and sends raw transactions
 
@@ -24,6 +24,6 @@ The wallet is EVM-only and runs against Tempo. One key serves every operation.
 
 Tempo has no native token. Balances are [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/overview) tokens, Tempo's protocol-level token standard, and gas is paid in USD-denominated stablecoins. TIP-20 extends ERC-20, so the CLI reads and writes through `balanceOf`, `transfer`, `approve`, and `allowance` and works against a plain ERC-20 contract too. `alln wallet balance <tokenAddress>` reads one token at a time, and `alln wallet transfer --token <address> --to <address> --amount <amount>` moves it.
 
-Escrow jobs settle in a payment token the provider picks from the escrow's whitelist, so `alln agent job set-budget` requires `--token`. x402 payments settle in USDC.
+Escrow jobs settle in a payment token the provider picks from the escrow's whitelist, so `alln agent job set-budget` requires `--token`. Direct payments settle in a Tempo stablecoin the service names in its Challenge.
 
 A hosted wallet interface is coming.
