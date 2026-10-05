@@ -1,5 +1,7 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
 import "@allegretto-network/ui/globals.css";
+import "lenis/dist/lenis.css";
+import "../styles/globals.css";
 import { FileQuestionMarkIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import {

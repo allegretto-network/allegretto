@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ReactLenis } from "lenis/react";
 import { useCopyToClipboard } from "@uidotdev/usehooks";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type RefObject } from "react";
 import LogoWordmark from "../assets/logo_wordmark.svg?react";
 import HeroPiano from "../assets/hero-piano.jpg";
 import OvertureHall from "../assets/overture-hall.jpg";
@@ -137,9 +138,74 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
+
+/* Adds .motion-ready (unhides the reveal CSS) and flips .is-visible as
+   elements enter the viewport. Containers marked data-reveal-stagger reveal
+   their [data-reveal] children as one cascade (FAQ rows, card grids).
+   Everything scrolls through Lenis. */
+function useReveals(root: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const container = root.current;
+    if (!container || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    container.classList.add("motion-ready");
+    const reveal = (el: Element, delay: string) => {
+      (el as HTMLElement).style.setProperty("--reveal-delay", delay);
+      el.classList.add("is-visible");
+    };
+    const groups = new Map<Element, NodeListOf<Element>>();
+    const singles: Element[] = [];
+    for (const el of container.querySelectorAll("[data-reveal]")) {
+      const group = el.closest("[data-reveal-stagger]");
+      if (group && !groups.has(group)) {
+        groups.set(group, group.querySelectorAll("[data-reveal]"));
+      } else if (!group) {
+        singles.push(el);
+      }
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        // Standalone elements arriving in the same batch cascade 60ms apart.
+        let batchIndex = 0;
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const children = groups.get(entry.target);
+          if (children) {
+            children.forEach((child, i) => reveal(child, `${Math.min(i * 60, 300)}ms`));
+          } else {
+            reveal(entry.target, `${Math.min(batchIndex * 60, 300)}ms`);
+            batchIndex++;
+          }
+          io.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -12% 0px", threshold: 0.1 },
+    );
+    for (const group of groups.keys()) io.observe(group);
+    singles.forEach((el) => io.observe(el));
+    return () => {
+      io.disconnect();
+      container.classList.remove("motion-ready");
+    };
+  }, [root]);
+}
+
 function Landing() {
-  return (
-    <div className="bg-background text-foreground">
+  const root = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
+  useReveals(root);
+  const page = (
+    <>
       <Nav />
       <main>
         <Hero />
@@ -151,6 +217,17 @@ function Landing() {
         <Coda />
       </main>
       <Footer />
+    </>
+  );
+  return (
+    <div ref={root} className="bg-background text-foreground">
+      {reducedMotion ? (
+        page
+      ) : (
+        <ReactLenis root options={{ lerp: 0.1, anchors: true }}>
+          {page}
+        </ReactLenis>
+      )}
     </div>
   );
 }
@@ -179,7 +256,7 @@ function Nav() {
         <Button
           render={<a href="#setup" />}
           nativeButton={false}
-          className="h-auto rounded-full px-[26px] py-3 font-mono text-sm font-semibold"
+          className="press h-auto rounded-full px-[26px] py-3 font-mono text-sm font-semibold"
         >
           GET STARTED
         </Button>
@@ -191,17 +268,17 @@ function Nav() {
 function Hero() {
   return (
     <section className="mx-auto max-w-[1920px] px-6 pt-12 pb-20 md:pt-[84px] md:pb-[84px] lg:px-10 xl:px-[100px]">
-      <p className="inline-flex gap-2.5 border border-gold/35 px-5 py-2.5 font-mono text-[13px] font-medium text-gold">
+      <p className="hero-beat inline-flex gap-2.5 border border-gold/35 px-5 py-2.5 font-mono text-[13px] font-medium text-gold">
         ♪ THE AGENT ECONOMY
       </p>
-      <h1 className="mt-8 font-serif text-[clamp(3rem,6.875vw,8.25rem)] font-light leading-[1.21]">
+      <h1 className="hero-beat mt-8 font-serif text-[clamp(3rem,6.875vw,8.25rem)] font-light leading-[1.21] [--beat:90ms]">
         Machines do the work.
       </h1>
-      <div className="relative -mx-6 mt-[30px] h-[400px] overflow-hidden md:mx-0 md:mt-8 md:h-[570px]">
+      <div className="hero-beat relative -mx-6 mt-[30px] h-[400px] overflow-hidden [--beat:200ms] md:mx-0 md:mt-8 md:h-[570px]">
         <img
           src={HeroPiano}
           alt="A grand piano on a dark stage"
-          className="absolute inset-0 size-full object-cover object-top md:bottom-auto md:size-auto md:aspect-[16/9] md:w-full md:object-fill"
+          className="hero-settle absolute inset-0 size-full object-cover object-top [--beat:200ms] md:bottom-auto md:size-auto md:aspect-[16/9] md:w-full md:object-fill"
         />
         <div
           className="absolute inset-0 md:hidden"
@@ -211,11 +288,11 @@ function Hero() {
           className="absolute inset-0 hidden md:block"
           style={{ backgroundImage: HERO_OVERLAY }}
         />
-        <p className="absolute inset-x-0 bottom-[8%] text-center font-serif text-[clamp(2.25rem,6.875vw,8.25rem)] font-light leading-[1.21] max-md:inset-x-6 max-md:bottom-auto max-md:top-[282px] max-md:flex max-md:w-[210px] max-md:flex-wrap max-md:items-baseline max-md:text-left max-md:text-[40px] max-md:leading-[1.2]">
+        <p className="hero-fade absolute inset-x-0 bottom-[8%] text-center font-serif text-[clamp(2.25rem,6.875vw,8.25rem)] font-light leading-[1.21] [--beat:520ms] max-md:inset-x-6 max-md:bottom-auto max-md:top-[282px] max-md:flex max-md:w-[210px] max-md:flex-wrap max-md:items-baseline max-md:text-left max-md:text-[40px] max-md:leading-[1.2]">
           Now they <span className="text-gold">get paid.</span>
         </p>
       </div>
-      <div className="mt-14 flex flex-col justify-between gap-10 md:mt-16 md:flex-row md:items-end">
+      <div className="hero-beat mt-14 flex flex-col justify-between gap-10 [--beat:340ms] md:mt-16 md:flex-row md:items-end">
         <p className="max-w-[560px] font-sans text-xl leading-6 text-muted-foreground">
           {DESCRIPTION}
         </p>
@@ -223,7 +300,7 @@ function Hero() {
           <Button
             render={<a href="#setup" />}
             nativeButton={false}
-            className="h-auto rounded-full px-[34px] py-[18px] font-mono text-sm font-semibold"
+            className="press h-auto rounded-full px-[34px] py-[18px] font-mono text-sm font-semibold"
           >
             SET UP YOUR AGENT
           </Button>
@@ -231,7 +308,7 @@ function Hero() {
             render={<a href={DOCS_URL} target="_blank" rel="noreferrer" />}
             nativeButton={false}
             variant="outline"
-            className="h-auto rounded-full border-white/18 bg-transparent px-[34px] py-[18px] font-mono text-sm font-medium hover:bg-input/30"
+            className="press h-auto rounded-full border-white/18 bg-transparent px-[34px] py-[18px] font-mono text-sm font-medium hover:bg-input/30"
           >
             BROWSE THE NETWORK
           </Button>
@@ -297,12 +374,13 @@ function SetupCard({
   label,
   className,
   promptClassName,
+  ...rest
 }: {
   copyVariant: keyof typeof COPY_STYLES;
   label: string;
   className: string;
   promptClassName: string;
-}) {
+} & ComponentProps<"div">) {
   const [, copy] = useCopyToClipboard();
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -315,16 +393,16 @@ function SetupCard({
   }
 
   return (
-    <div className={`flex flex-col gap-[22px] border bg-card ${className}`}>
+    <div {...rest} className={`flex flex-col gap-[22px] border bg-card ${className}`}>
       <div className="flex items-center justify-between gap-4">
         <p className="font-mono text-xs text-[#7a7a7a]">{label}</p>
         <button
           type="button"
           onClick={onCopy}
-          className={`flex shrink-0 items-center gap-2 font-mono text-xs font-semibold transition-colors ${COPY_STYLES[copyVariant].button}`}
+          className={`press flex shrink-0 items-center gap-2 font-mono text-xs font-semibold ${COPY_STYLES[copyVariant].button}`}
         >
           {copied ? (
-            <CheckIcon className={COPY_STYLES[copyVariant].icon} />
+            <CheckIcon className={`${COPY_STYLES[copyVariant].icon} pop-in`} />
           ) : (
             <CopyIcon className={COPY_STYLES[copyVariant].icon} />
           )}
@@ -339,19 +417,65 @@ function SetupCard({
   );
 }
 
+/* Drives the image parallax from scroll position each frame — works with or
+   without Lenis, in every browser. Reads geometry once per frame, writes
+   transform only. Skipped entirely under prefers-reduced-motion. */
+function ParallaxImg(props: ComponentProps<"img">) {
+  const frame = useRef<HTMLDivElement>(null);
+  const img = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const el = img.current;
+    const frameEl = frame.current;
+    if (!el || !frameEl || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    let lastScrollY = Number.NaN;
+    const update = () => {
+      const rect = frameEl.getBoundingClientRect();
+      const progress = Math.max(
+        -1,
+        Math.min(
+          1,
+          (rect.top + rect.height / 2 - innerHeight / 2) / (innerHeight / 2 + rect.height / 2),
+        ),
+      );
+      el.style.transform = `translate3d(0, ${(-4 * progress).toFixed(3)}%, 0) scale(1.09)`;
+    };
+    const tick = () => {
+      if (window.scrollY !== lastScrollY) {
+        lastScrollY = window.scrollY;
+        update();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    update();
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <div ref={frame} className="absolute inset-0">
+      <img ref={img} {...props} />
+    </div>
+  );
+}
+
 function Overture() {
   return (
-    <section className="relative overflow-hidden">
-      <div className="absolute inset-0">
-        <img
-          src={OvertureHall}
-          alt=""
-          className="size-full object-cover opacity-60"
-          loading="lazy"
-        />
-        <div className="absolute inset-0" style={{ backgroundImage: OVERTURE_OVERLAY }} />
-      </div>
-      <div className="relative mx-auto flex max-w-[1920px] flex-col items-center gap-[72px] px-6 py-32 text-center lg:px-10 lg:py-[210px] xl:px-[100px]">
+    /* overflow-clip: clips the background image without creating a scroll
+       container, so the parallax never leaks into adjacent sections. */
+    <section className="relative overflow-clip">
+      <ParallaxImg
+        src={OvertureHall}
+        alt=""
+        className="size-full object-cover opacity-60"
+        loading="lazy"
+      />
+      <div className="absolute inset-0" style={{ backgroundImage: OVERTURE_OVERLAY }} />
+      <div
+        data-reveal
+        className="relative mx-auto flex max-w-[1920px] flex-col items-center gap-[72px] px-6 py-32 text-center lg:px-10 lg:py-[210px] xl:px-[100px]"
+      >
         <Eyebrow>Overture</Eyebrow>
         <h2 className="font-serif text-[clamp(2.25rem,4.79vw,5.75rem)] font-light leading-[1.22]">
           The next trillion in transactions won&apos;t be human.{" "}
@@ -371,14 +495,17 @@ function Score() {
   return (
     <section id="network" className="border-t border-white/6">
       <div className="mx-auto max-w-[1920px] px-6 pt-24 pb-28 lg:px-10 lg:pt-[150px] lg:pb-[170px] xl:px-[100px]">
-        <Eyebrow>The Score</Eyebrow>
-        <h2 className="mt-[30px] font-serif text-[clamp(2.5rem,3.33vw,4rem)] font-light leading-[1.22]">
-          An economy, in three movements.
-        </h2>
+        <div data-reveal>
+          <Eyebrow>The Score</Eyebrow>
+          <h2 className="mt-[30px] font-serif text-[clamp(2.5rem,3.33vw,4rem)] font-light leading-[1.22]">
+            An economy, in three movements.
+          </h2>
+        </div>
         <div className="mt-[100px] flex flex-col">
           {MOVEMENTS.map((movement) => (
             <div
               key={movement.num}
+              data-reveal
               className="flex flex-col gap-4 border-t border-white/8 py-11 md:grid md:grid-cols-[60px_440px_1fr] md:gap-x-[60px]"
             >
               <span className="font-mono text-[15px] leading-[18px] text-gold">{movement.num}</span>
@@ -400,16 +527,17 @@ function Tempo() {
   return (
     <section className="border-t border-white/6">
       <div className="mx-auto max-w-[1920px] px-6 pt-24 pb-28 lg:px-10 lg:pt-[150px] lg:pb-[170px] xl:px-[100px]">
-        <div className="flex flex-col items-center gap-[30px] text-center">
+        <div data-reveal className="flex flex-col items-center gap-[30px] text-center">
           <Eyebrow>Tempo</Eyebrow>
           <h2 className="font-serif text-[clamp(2.5rem,3.33vw,4rem)] font-light leading-[1.22]">
             Money, at the right speed.
           </h2>
         </div>
-        <div className="mt-[90px] grid gap-12 md:grid-cols-2">
+        <div data-reveal-stagger className="mt-[90px] grid gap-12 md:grid-cols-2">
           {TEMPOS.map((tempo) => (
             <div
               key={tempo.label}
+              data-reveal
               className={`flex flex-col gap-[26px] rounded-3xl border bg-card px-8 py-13 md:px-14 md:py-[52px] ${tempo.gold ? "border-gold/28" : "border-white/9"}`}
             >
               <p className="font-mono text-xs text-[#7a7a7a]">{tempo.label}</p>
@@ -431,17 +559,18 @@ function Reprise() {
   return (
     <section className="border-t border-white/6">
       <div className="mx-auto max-w-[1920px] px-6 pt-24 pb-28 lg:px-10 lg:pt-[150px] lg:pb-[170px] xl:px-[100px]">
-        <div className="flex flex-col items-center gap-[30px] text-center">
+        <div data-reveal className="flex flex-col items-center gap-[30px] text-center">
           <Eyebrow>Reprise</Eyebrow>
           <h2 className="font-serif text-[clamp(2.5rem,3.33vw,4rem)] font-light leading-[1.22]">
             Fair questions, straight answers.
           </h2>
         </div>
-        <Accordion className="mx-auto mt-[90px] w-full max-w-[1280px]">
+        <Accordion data-reveal-stagger className="mx-auto mt-[90px] w-full max-w-[1280px]">
           {FAQS.map((faq) => (
             <AccordionItem
               key={faq.q}
               value={faq.q}
+              data-reveal
               className="border-t border-white/8 last:border-b"
             >
               <AccordionTrigger className="rounded-none px-2 py-[34px] font-sans text-[22px] font-medium leading-[28px] [&_[data-slot=accordion-trigger-icon]]:size-5 [&_[data-slot=accordion-trigger-icon]]:text-gold">
@@ -462,12 +591,13 @@ function Reprise() {
 
 function Coda() {
   return (
-    <section className="relative overflow-hidden border-t border-white/6">
-      <div className="absolute inset-0">
-        <img src={CodaCurtain} alt="" className="size-full object-cover" loading="lazy" />
-        <div className="absolute inset-0" style={{ backgroundImage: CODA_OVERLAY }} />
-      </div>
-      <div className="relative mx-auto flex max-w-[1920px] flex-col items-center gap-11 px-6 pt-32 pb-36 text-center lg:px-10 lg:pt-[200px] lg:pb-[230px] xl:px-[100px]">
+    <section className="relative overflow-clip border-t border-white/6">
+      <ParallaxImg src={CodaCurtain} alt="" className="size-full object-cover" loading="lazy" />
+      <div className="absolute inset-0" style={{ backgroundImage: CODA_OVERLAY }} />
+      <div
+        data-reveal
+        className="relative mx-auto flex max-w-[1920px] flex-col items-center gap-11 px-6 pt-32 pb-36 text-center lg:px-10 lg:pt-[200px] lg:pb-[230px] xl:px-[100px]"
+      >
         <Eyebrow>Coda</Eyebrow>
         <h2 className="font-serif text-[clamp(2.75rem,5vw,6rem)] font-light leading-[1.21]">
           Take the stage.
@@ -478,6 +608,7 @@ function Coda() {
         <SetupCard
           copyVariant="primary"
           label="PASTE THIS INTO YOUR AGENT"
+          data-reveal="late"
           className="mt-[18px] w-full max-w-[1000px] rounded-[20px] border-gold/32 px-7 py-9 md:px-[42px]"
           promptClassName="text-[17px] leading-[22px]"
         />

@@ -1,0 +1,108 @@
+/* Web-app motion layer, complementing @allegretto-network/ui/globals.css.
+   Scroll effects are driven by Lenis + JS (apps/web/src/routes/index.tsx),
+   so they work in every browser. Transform/opacity only; prefers-reduced-motion
+   keeps fades and drops all movement. */
+
+:root {
+  --ease-out-expo: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Hero beats play once per visit; per-element delay arrives via --beat. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in-soft {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hero-settle {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.hero-beat {
+  animation: rise-in 0.7s var(--ease-out-expo) both;
+  animation-delay: var(--beat, 0ms);
+}
+.hero-fade {
+  animation: fade-in-soft 0.9s var(--ease-out-expo) both;
+  animation-delay: var(--beat, 0ms);
+}
+.hero-settle {
+  animation: hero-settle 1.4s var(--ease-out-expo) both;
+  animation-delay: var(--beat, 0ms);
+}
+.pop-in {
+  animation: pop-in 0.2s var(--ease-out-expo);
+}
+
+/* Reduced motion: keep the gentle fades, drop all movement. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-beat,
+  .hero-fade {
+    animation-name: fade-in-soft;
+    animation-duration: 0.4s;
+    animation-timing-function: ease;
+  }
+  .hero-settle {
+    animation: none;
+  }
+}
+
+/* Press feedback: transitions + active scale. Unlayered, so it overrides the
+   shared Button's transition-all. */
+.press {
+  transition-property:
+    color, background-color, border-color, box-shadow, transform, scale, translate;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-out-expo);
+}
+.press:active {
+  scale: 0.97;
+}
+
+/* Scroll reveals. The hidden state only exists under .motion-ready — added by
+   JS before observing — so content is never invisible without JavaScript. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-ready [data-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  .motion-ready [data-reveal="late"] {
+    transform: translateY(32px);
+  }
+  .motion-ready [data-reveal].is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity 0.7s var(--ease-out-expo),
+      transform 0.7s var(--ease-out-expo);
+    /* Batch stagger: elements entering together cascade (set by useReveals). */
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+}
