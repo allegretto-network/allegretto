@@ -285,10 +285,10 @@ async function transferTokens(
       `This wallet holds ${formatTokenAmount(held, metadata)} but tried to send ${formatTokenAmount(wei, metadata)}.`,
     );
 
-  // Left unset, Tempo's preference rules already pick the transferred USD TIP-20
-  // for a single transfer call, so an explicit default would only bypass
-  // requireFeeToken's paused/registered checks without changing the outcome.
-  const feeToken = await requireFeeToken(opts.feeToken);
+  // Already validated by the transfer action via requireFeeToken; left unset,
+  // Tempo's preference rules pick the transferred USD TIP-20 for a single
+  // transfer call, so no explicit default is needed.
+  const feeToken = opts.feeToken;
   const feeMetadata =
     feeToken === undefined
       ? null
