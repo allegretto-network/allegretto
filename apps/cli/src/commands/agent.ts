@@ -7,8 +7,8 @@ import {
 import { erc8004IdentityRegistryAbi } from "@allegretto-network/core/abis/erc8004";
 import pc from "picocolors";
 import { v4 as uuidv4 } from "uuid";
-import { createPublicClient, createWalletClient, http, parseEventLogs } from "viem";
-import { tempo } from "viem/chains";
+import type { Address } from "viem";
+import { parseEventLogs } from "viem";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
 import {
@@ -28,7 +28,8 @@ import { api, requestJson, requireOnchainAgentId } from "../lib/api.ts";
 import { formatScore } from "../lib/feedback.ts";
 import { openSession, requireUserId, requireWallet } from "../lib/session.ts";
 import type { WalletSession } from "../lib/privy.ts";
-import { toWalletAccount } from "../lib/viem.ts";
+import { feeTokenSchema, readFeeToken, requireFeeToken } from "../lib/token.ts";
+import { tempoClient, walletClient } from "../lib/viem.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
 import {
@@ -711,20 +712,26 @@ const push = zodCommand({
       .boolean()
       .prefault(false)
       .describe("Show what push would do without sending transactions"),
+    "fee-token": feeTokenSchema,
   },
   action: async (args, opts) => {
     const json = isJson(push);
     // commander camelCases --dry-run; zod-commander's opts type keeps the literal key.
     const dryRun = (opts as { dryRun?: boolean }).dryRun === true;
 
-    const result = await pushAgent(args.agentId, dryRun, json).catch((error: Error) => error);
+    const result = await pushAgent(
+      args.agentId,
+      dryRun,
+      await requireFeeToken(readFeeToken(opts)),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     if (result.dryRun)
       return ok(
         fields([
           ["Agent", `${pc.bold(result.name)} ${pc.dim(`(${result.id})`)}`],
-          ["Chain", pc.bold(tempo.name)],
+          ["Chain", pc.bold(tempoClient.chain.name)],
           ["Wallet", pc.cyan(result.address)],
           ["Registry", result.agentRegistry],
           [
@@ -751,7 +758,7 @@ const push = zodCommand({
         success("Agent pushed"),
         fields([
           ["Agent", `${pc.bold(result.name)} ${pc.dim(`(${result.id})`)}`],
-          ["Chain", pc.bold(tempo.name)],
+          ["Chain", pc.bold(tempoClient.chain.name)],
           ["Onchain Agent ID", `#${result.onchainAgentId}`],
           ["Registry", result.agentRegistry],
           ...(result.registerTxHash
@@ -765,7 +772,12 @@ const push = zodCommand({
   },
 });
 
-async function pushAgent(agentId: string, dryRun: boolean, json: boolean) {
+async function pushAgent(
+  agentId: string,
+  dryRun: boolean,
+  feeToken: Address | undefined,
+  json: boolean,
+) {
   const userId = await requireUserId();
   const card = await readAgentCard(userId, agentId);
   const session = await openSession();
@@ -788,7 +800,7 @@ async function pushAgent(agentId: string, dryRun: boolean, json: boolean) {
 
   const registered = existing
     ? { registration: existing, txHash: null }
-    : await registerAgent(session, wallet, agentRegistry, json);
+    : await registerAgent(session, wallet, agentRegistry, feeToken, json);
 
   // The onchain id is persisted before setAgentURI so a failure there cannot
   // orphan the registration; re-running push then skips register().
@@ -803,20 +815,15 @@ async function pushAgent(agentId: string, dryRun: boolean, json: boolean) {
 
   const agentUri = toAgentUri(next);
   progress(json, `Setting agent URI (${agentUri.length} bytes)…`);
-  const setUriTxHash = await createWalletClient({
-    account: toWalletAccount(session, wallet),
-    chain: tempo,
-    transport: http(),
-  }).writeContract({
+  const setUriTxHash = await walletClient(session, wallet).writeContract({
+    type: "tempo",
+    feeToken,
     address: IDENTITY_REGISTRY,
     abi: erc8004IdentityRegistryAbi,
     functionName: "setAgentURI",
     args: [BigInt(registered.registration.agentId), agentUri],
   });
-  await createPublicClient({
-    chain: tempo,
-    transport: http(),
-  }).waitForTransactionReceipt({ hash: setUriTxHash });
+  await tempoClient.waitForTransactionReceipt({ hash: setUriTxHash });
 
   return {
     dryRun: false as const,
@@ -838,24 +845,20 @@ async function registerAgent(
   session: WalletSession,
   wallet: Wallet,
   agentRegistry: string,
+  feeToken: Address | undefined,
   json: boolean,
 ) {
   progress(json, "Registering agent onchain…");
-  const txHash = await createWalletClient({
-    account: toWalletAccount(session, wallet),
-    chain: tempo,
-    transport: http(),
-  }).writeContract({
+  const txHash = await walletClient(session, wallet).writeContract({
+    type: "tempo",
+    feeToken,
     address: IDENTITY_REGISTRY,
     abi: erc8004IdentityRegistryAbi,
     functionName: "register",
     args: [],
   });
 
-  const receipt = await createPublicClient({
-    chain: tempo,
-    transport: http(),
-  }).waitForTransactionReceipt({ hash: txHash });
+  const receipt = await tempoClient.waitForTransactionReceipt({ hash: txHash });
   const events = parseEventLogs({
     abi: erc8004IdentityRegistryAbi,
     logs: receipt.logs,

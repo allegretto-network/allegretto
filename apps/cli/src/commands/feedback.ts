@@ -2,16 +2,7 @@ import { AGENTIC_COMMERCE, REPUTATION_REGISTRY, type Wallet } from "@allegretto-
 import { erc8004ReputationRegistryAbi } from "@allegretto-network/core/abis/erc8004";
 import { erc8183AgenticCommerceAbi } from "@allegretto-network/core/abis/erc8183";
 import pc from "picocolors";
-import {
-  type Address,
-  createPublicClient,
-  createWalletClient,
-  http,
-  isAddress,
-  parseEventLogs,
-  zeroAddress,
-} from "viem";
-import { tempo } from "viem/chains";
+import { type Address, isAddress, parseEventLogs, zeroAddress } from "viem";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
 import { api, requestJson, requireOnchainAgentId } from "../lib/api.ts";
@@ -21,9 +12,9 @@ import {
   resolveFeedbackDocument,
   toFeedbackUri,
 } from "../lib/feedback.ts";
-import type { WalletSession } from "../lib/privy.ts";
 import { openSession, requireWallet } from "../lib/session.ts";
-import { toWalletAccount } from "../lib/viem.ts";
+import { feeTokenSchema, readFeeToken, requireFeeToken } from "../lib/token.ts";
+import { tempoClient, walletClient } from "../lib/viem.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
 import { err, fields, formatRelative, isJson, ok, shortAddress, success } from "../utils/result.ts";
@@ -51,22 +42,25 @@ const give = zodCommand({
       .boolean()
       .prefault(false)
       .describe("Show what give would do without sending a transaction"),
+    "fee-token": feeTokenSchema,
   },
   action: async (args, opts) => {
     const json = isJson(give);
     // commander camelCases --dry-run; zod-commander's opts type keeps the literal key.
     const dryRun = (opts as { dryRun?: boolean }).dryRun === true;
 
-    const result = await giveFeedback(args.agentId, { ...opts, dryRun }, json).catch(
-      (error: Error) => error,
-    );
+    const result = await giveFeedback(
+      args.agentId,
+      { ...opts, dryRun, feeToken: await requireFeeToken(readFeeToken(opts)) },
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     if (result.dryRun)
       return ok(
         fields([
           ["Agent", `${pc.bold(result.agentName)} ${pc.dim(`(#${result.agentId})`)}`],
-          ["Chain", pc.bold(tempo.name)],
+          ["Chain", pc.bold(tempoClient.chain.name)],
           ["Wallet", pc.cyan(result.client)],
           ["Registry", result.registry],
           ["Score", `★ ${formatScore(result.score)}`],
@@ -111,6 +105,7 @@ async function giveFeedback(
     data?: unknown;
     file?: string;
     dryRun: boolean;
+    feeToken?: Address;
   },
   json: boolean,
 ) {
@@ -156,6 +151,8 @@ async function giveFeedback(
   progress(json, `Giving feedback to agent #${agentId}…`);
   const txHash = await walletClient(session, wallet)
     .writeContract({
+      type: "tempo",
+      feeToken: opts.feeToken,
       address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "giveFeedback",
@@ -348,12 +345,18 @@ const revoke = zodCommand({
       .positive()
       .describe("Per-client feedback index from `alln agent feedback list`"),
   },
-  action: async (args) => {
+  opts: {
+    "fee-token": feeTokenSchema,
+  },
+  action: async (args, opts) => {
     const json = isJson(revoke);
 
-    const result = await revokeFeedback(args.agentId, args.feedbackIndex, json).catch(
-      (error: Error) => error,
-    );
+    const result = await revokeFeedback(
+      args.agentId,
+      args.feedbackIndex,
+      await requireFeeToken(readFeeToken(opts)),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -372,7 +375,12 @@ const revoke = zodCommand({
   },
 });
 
-async function revokeFeedback(agentId: string, index: number, json: boolean) {
+async function revokeFeedback(
+  agentId: string,
+  index: number,
+  feeToken: Address | undefined,
+  json: boolean,
+) {
   const id = BigInt(requireOnchainAgentId(agentId));
   const session = await openSession();
   const wallet = requireWallet(session);
@@ -387,6 +395,8 @@ async function revokeFeedback(agentId: string, index: number, json: boolean) {
   progress(json, `Revoking feedback #${index} on agent #${agentId}…`);
   const txHash = await walletClient(session, wallet)
     .writeContract({
+      type: "tempo",
+      feeToken,
       address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "revokeFeedback",
@@ -413,6 +423,7 @@ const respond = zodCommand({
   opts: {
     data: jsonStringSchema.optional().describe("d;Response document as a JSON string"),
     file: z.string().optional().describe("f;Path to a response document JSON file"),
+    "fee-token": feeTokenSchema,
   },
   action: async (args, opts) => {
     const json = isJson(respond);
@@ -421,7 +432,7 @@ const respond = zodCommand({
       args.agentId,
       args.client,
       args.feedbackIndex,
-      opts,
+      { ...opts, feeToken: await requireFeeToken(readFeeToken(opts)) },
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
@@ -445,7 +456,7 @@ async function respondToFeedback(
   agentId: string,
   client: string,
   index: number,
-  opts: { data?: unknown; file?: string },
+  opts: { data?: unknown; file?: string; feeToken?: Address },
   json: boolean,
 ) {
   const id = BigInt(requireOnchainAgentId(agentId));
@@ -465,6 +476,8 @@ async function respondToFeedback(
   progress(json, `Responding to feedback #${index} on agent #${agentId}…`);
   const txHash = await walletClient(await openSession())
     .writeContract({
+      type: "tempo",
+      feeToken: opts.feeToken,
       address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "appendResponse",
@@ -519,15 +532,7 @@ function agentNotFound(agentId: string): CliError {
 }
 
 function publicClient() {
-  return createPublicClient({ chain: tempo, transport: http() });
-}
-
-function walletClient(session: WalletSession, wallet: Wallet = requireWallet(session)) {
-  return createWalletClient({
-    account: toWalletAccount(session, wallet),
-    chain: tempo,
-    transport: http(),
-  });
+  return tempoClient;
 }
 
 // The reputation registry reverts with require strings rather than custom

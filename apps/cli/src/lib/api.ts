@@ -4,7 +4,9 @@ import { hc } from "hono/client";
 import type { ClientResponse } from "hono/client";
 import { CliError } from "../utils/errors.ts";
 
-export const api = hc<ApiClientType>(ALLEGRETTO_API_URL);
+const baseUrl = process.env.ALLEGRETTO_API_URL || ALLEGRETTO_API_URL;
+
+export const api = hc<ApiClientType>(baseUrl);
 
 type SuccessJson<R> =
   R extends ClientResponse<infer T, infer S, "json"> ? (S extends 200 ? T : never) : never;
@@ -21,7 +23,7 @@ export async function requestJson<R extends ClientResponse<unknown>>(
   if (response === null)
     throw new CliError(
       "API_REQUEST_FAILED",
-      `Could not reach the Allegretto API at ${ALLEGRETTO_API_URL}.`,
+      `Could not reach the Allegretto API at ${baseUrl}.`,
       "Check your network connection, then run the command again.",
     );
   if (response.status === 404 && notFound) throw notFound;
