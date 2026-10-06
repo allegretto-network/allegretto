@@ -41,6 +41,11 @@ function AuthorizeProvider() {
           theme: dark ? "dark" : "light",
           accentColor: dark ? "#e4e4e7" : "#27272a",
         },
+        embeddedWallets: {
+          ethereum: {
+            createOnLogin: "all-users",
+          },
+        },
       }}
     >
       <AuthorizePage />
