@@ -285,13 +285,16 @@ async function transferTokens(
       `This wallet holds ${formatTokenAmount(held, metadata)} but tried to send ${formatTokenAmount(wei, metadata)}.`,
     );
 
-  // Paying the fee in the token being sent means a wallet holding only that
-  // token can still move it. Only USD-denominated TIP-20s may pay fees, so for
-  // anything else the field stays unset and Tempo's own preference rules pick —
-  // forcing an ineligible token here would make the transaction invalid.
-  const feeToken = opts.feeToken ?? (metadata?.currency === "USD" ? (token as Address) : undefined);
+  // Left unset, Tempo's preference rules already pick the transferred USD TIP-20
+  // for a single transfer call, so an explicit default would only bypass
+  // requireFeeToken's paused/registered checks without changing the outcome.
+  const feeToken = await requireFeeToken(opts.feeToken);
   const feeMetadata =
-    feeToken === undefined || feeToken === token ? metadata : await readTokenMetadata(feeToken);
+    feeToken === undefined
+      ? null
+      : feeToken === token
+        ? metadata
+        : await readTokenMetadata(feeToken);
 
   // Tempo's transaction type (118) carries a list of calls and lets fees be
   // paid in a TIP-20, so every write asks for it explicitly.
