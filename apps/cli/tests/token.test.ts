@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { feeTokenSchema, readFeeToken } from "../src/lib/token.ts";
+import { feeTokenSchema, readFeeToken, requireFeeToken } from "../src/lib/token.ts";
 
 const usdc = "0x20c000000000000000000000b9537d11c60e8b50";
 
@@ -21,4 +21,10 @@ test("reads the camelCased flag commander actually sets", () => {
   expect(readFeeToken({ feeToken: usdc })).toBe(usdc);
   expect(readFeeToken({ "fee-token": usdc })).toBeUndefined();
   expect(readFeeToken({})).toBeUndefined();
+});
+
+// requireFeeToken passes undefined straight through — the flag is optional and
+// its absence means Tempo's own preference rules apply.
+test("requireFeeToken passes undefined without calling the RPC", async () => {
+  await expect(requireFeeToken(undefined)).resolves.toBeUndefined();
 });

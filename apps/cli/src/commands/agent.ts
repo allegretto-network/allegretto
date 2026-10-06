@@ -28,7 +28,7 @@ import { api, requestJson, requireOnchainAgentId } from "../lib/api.ts";
 import { formatScore } from "../lib/feedback.ts";
 import { openSession, requireUserId, requireWallet } from "../lib/session.ts";
 import type { WalletSession } from "../lib/privy.ts";
-import { feeTokenSchema, readFeeToken } from "../lib/token.ts";
+import { feeTokenSchema, readFeeToken, requireFeeToken } from "../lib/token.ts";
 import { tempoClient, walletClient } from "../lib/viem.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
@@ -719,9 +719,12 @@ const push = zodCommand({
     // commander camelCases --dry-run; zod-commander's opts type keeps the literal key.
     const dryRun = (opts as { dryRun?: boolean }).dryRun === true;
 
-    const result = await pushAgent(args.agentId, dryRun, readFeeToken(opts), json).catch(
-      (error: Error) => error,
-    );
+    const result = await pushAgent(
+      args.agentId,
+      dryRun,
+      await requireFeeToken(readFeeToken(opts)),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     if (result.dryRun)

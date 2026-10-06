@@ -13,7 +13,7 @@ import {
   toFeedbackUri,
 } from "../lib/feedback.ts";
 import { openSession, requireWallet } from "../lib/session.ts";
-import { feeTokenSchema, readFeeToken } from "../lib/token.ts";
+import { feeTokenSchema, readFeeToken, requireFeeToken } from "../lib/token.ts";
 import { tempoClient, walletClient } from "../lib/viem.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
@@ -51,7 +51,7 @@ const give = zodCommand({
 
     const result = await giveFeedback(
       args.agentId,
-      { ...opts, dryRun, feeToken: readFeeToken(opts) },
+      { ...opts, dryRun, feeToken: await requireFeeToken(readFeeToken(opts)) },
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
@@ -354,7 +354,7 @@ const revoke = zodCommand({
     const result = await revokeFeedback(
       args.agentId,
       args.feedbackIndex,
-      readFeeToken(opts),
+      await requireFeeToken(readFeeToken(opts)),
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
@@ -432,7 +432,7 @@ const respond = zodCommand({
       args.agentId,
       args.client,
       args.feedbackIndex,
-      { ...opts, feeToken: readFeeToken(opts) },
+      { ...opts, feeToken: await requireFeeToken(readFeeToken(opts)) },
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);

@@ -10,6 +10,7 @@ import {
   parseTokenAmount,
   readFeeToken,
   readTokenMetadata,
+  requireFeeToken,
   tokenLabel,
 } from "../lib/token.ts";
 import { tempoClient, toWalletAccount, walletClient } from "../lib/viem.ts";
@@ -116,7 +117,7 @@ const sendTransaction = zodCommand({
     const result = await broadcastTransaction({
       to: opts.to,
       data: opts.data,
-      feeToken: readFeeToken(opts),
+      feeToken: await requireFeeToken(readFeeToken(opts)),
     }).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
@@ -226,7 +227,7 @@ const transfer = zodCommand({
     const asUnit = (opts as { asUnit?: boolean }).asUnit === true;
 
     const result = await transferTokens(opts.token, opts.to, opts.amount, asUnit, {
-      feeToken: readFeeToken(opts),
+      feeToken: await requireFeeToken(readFeeToken(opts)),
     }).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
@@ -238,7 +239,12 @@ const transfer = zodCommand({
           ["To", pc.cyan(result.to)],
           ["Token", tokenLabel(result.token, result.symbol)],
           ["Amount", `${result.formatted} ${pc.dim(`(${result.amount} base units)`)}`],
-          ["Fee Token", tokenLabel(result.feeToken, result.feeSymbol)],
+          [
+            "Fee Token",
+            result.feeToken
+              ? tokenLabel(result.feeToken, result.feeSymbol)
+              : pc.dim("chosen by Tempo"),
+          ],
           ["Tx", pc.cyan(result.hash)],
         ]),
       ].join("\n"),
@@ -280,10 +286,12 @@ async function transferTokens(
     );
 
   // Paying the fee in the token being sent means a wallet holding only that
-  // token can still transfer it. Tempo would pick the same token for a bare
-  // transfer, but saying so explicitly keeps the fee off an unrelated balance.
-  const feeToken = opts.feeToken ?? (token as Address);
-  const feeMetadata = feeToken === token ? metadata : await readTokenMetadata(feeToken);
+  // token can still move it. Only USD-denominated TIP-20s may pay fees, so for
+  // anything else the field stays unset and Tempo's own preference rules pick —
+  // forcing an ineligible token here would make the transaction invalid.
+  const feeToken = opts.feeToken ?? (metadata?.currency === "USD" ? (token as Address) : undefined);
+  const feeMetadata =
+    feeToken === undefined || feeToken === token ? metadata : await readTokenMetadata(feeToken);
 
   // Tempo's transaction type (118) carries a list of calls and lets fees be
   // paid in a TIP-20, so every write asks for it explicitly.
@@ -304,7 +312,7 @@ async function transferTokens(
     symbol: metadata?.symbol ?? null,
     amount: wei.toString(),
     formatted: formatTokenAmount(wei, metadata),
-    feeToken,
+    feeToken: feeToken ?? null,
     feeSymbol: feeMetadata?.symbol ?? null,
     hash,
   };

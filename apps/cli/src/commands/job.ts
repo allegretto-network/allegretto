@@ -14,6 +14,7 @@ import {
   parseTokenAmount,
   readFeeToken,
   readTokenMetadata,
+  requireFeeToken,
   tokenLabel,
   type TokenMetadata,
 } from "../lib/token.ts";
@@ -216,7 +217,7 @@ const create = zodCommand({
       args.description,
       agentId,
       expiresIn,
-      readFeeToken(opts),
+      await requireFeeToken(readFeeToken(opts)),
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
@@ -355,7 +356,7 @@ const setBudget = zodCommand({
     const result = await setJobBudget(
       args.jobId,
       opts.amount,
-      { token: opts.token, unit: asUnit, feeToken: readFeeToken(opts) },
+      { token: opts.token, unit: asUnit, feeToken: await requireFeeToken(readFeeToken(opts)) },
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
@@ -447,9 +448,11 @@ const agree = zodCommand({
   action: async (args, opts) => {
     const json = isJson(agree);
 
-    const result = await agreeJob(args.jobId, readFeeToken(opts), json).catch(
-      (error: Error) => error,
-    );
+    const result = await agreeJob(
+      args.jobId,
+      await requireFeeToken(readFeeToken(opts)),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -592,9 +595,12 @@ const deliver = zodCommand({
   action: async (args, opts) => {
     const json = isJson(deliver);
 
-    const result = await deliverJob(args.jobId, args.fileHash, readFeeToken(opts), json).catch(
-      (error: Error) => error,
-    );
+    const result = await deliverJob(
+      args.jobId,
+      args.fileHash,
+      await requireFeeToken(readFeeToken(opts)),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -661,7 +667,7 @@ const complete = zodCommand({
       "complete",
       args.jobId,
       opts.reason,
-      readFeeToken(opts),
+      await requireFeeToken(readFeeToken(opts)),
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
@@ -699,7 +705,7 @@ const reject = zodCommand({
       "reject",
       args.jobId,
       opts.reason,
-      readFeeToken(opts),
+      await requireFeeToken(readFeeToken(opts)),
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
@@ -766,9 +772,11 @@ const refund = zodCommand({
   action: async (args, opts) => {
     const json = isJson(refund);
 
-    const result = await refundJob(args.jobId, readFeeToken(opts), json).catch(
-      (error: Error) => error,
-    );
+    const result = await refundJob(
+      args.jobId,
+      await requireFeeToken(readFeeToken(opts)),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
