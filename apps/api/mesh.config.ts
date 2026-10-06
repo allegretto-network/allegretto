@@ -2,15 +2,24 @@ import { defineConfig, loadGraphQLHTTPSubgraph } from "@graphql-mesh/compose-cli
 
 import { requireEnv } from "./scripts/env.js";
 
+// The Graph requires an API key, but it must never land in the committed
+// artifact: compose-time introspection authenticates with schemaHeaders,
+// while the runtime calls interpolate the {env.*} templates below from
+// process.env — Worker secrets surface there under nodejs_compat
+// (wrangler secret put ERC_8004_SUBGRAPH_API_KEY / ERC_8183_SUBGRAPH_API_KEY).
+
 // Composes the erc-8004 and erc-8183 subgraphs into a single supergraph.
-//
-// Both subgraphs are public Goldsky endpoints; no authentication is sent at
-// compose time or runtime.
 export const composeConfig = defineConfig({
   subgraphs: [
     {
       sourceHandler: loadGraphQLHTTPSubgraph("ERC8004", {
         endpoint: requireEnv("ERC_8004_SUBGRAPH_URL"),
+        schemaHeaders: {
+          Authorization: `Bearer ${requireEnv("ERC_8004_SUBGRAPH_API_KEY")}`,
+        },
+        operationHeaders: {
+          Authorization: "Bearer {env.ERC_8004_SUBGRAPH_API_KEY}",
+        },
         // graph-node resolves null for the non-null `isDeprecated` field when
         // input-value deprecation is requested, failing the whole
         // introspection. Codegen never asked for it either.
@@ -20,6 +29,12 @@ export const composeConfig = defineConfig({
     {
       sourceHandler: loadGraphQLHTTPSubgraph("ERC8183", {
         endpoint: requireEnv("ERC_8183_SUBGRAPH_URL"),
+        schemaHeaders: {
+          Authorization: `Bearer ${requireEnv("ERC_8183_SUBGRAPH_API_KEY")}`,
+        },
+        operationHeaders: {
+          Authorization: "Bearer {env.ERC_8183_SUBGRAPH_API_KEY}",
+        },
         // graph-node resolves null for the non-null `isDeprecated` field when
         // input-value deprecation is requested, failing the whole
         // introspection. Codegen never asked for it either.

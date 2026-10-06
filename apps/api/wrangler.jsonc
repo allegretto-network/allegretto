@@ -8,7 +8,9 @@
     "enabled": true,
     "head_sampling_rate": 1,
   },
-  // Tempo subgraph endpoints are not provisioned yet; fill these in before deploy.
+  // Tempo subgraph endpoints are not provisioned yet; fill these in before
+  // deploy. The Graph API keys are secrets, not vars: set them with
+  // `wrangler secret put ERC_8004_SUBGRAPH_API_KEY` (and the 8183 counterpart).
   "vars": {
     "ERC_8004_SUBGRAPH_URL": "",
     "ERC_8183_SUBGRAPH_URL": "",
