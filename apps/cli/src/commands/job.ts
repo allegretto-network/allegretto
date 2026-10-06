@@ -9,8 +9,10 @@ import { api, requestJson, requireOnchainAgentId } from "../lib/api.ts";
 import type { WalletSession } from "../lib/privy.ts";
 import { openSession, requireWallet } from "../lib/session.ts";
 import {
+  feeTokenSchema,
   formatTokenAmount,
   parseTokenAmount,
+  readFeeToken,
   readTokenMetadata,
   tokenLabel,
   type TokenMetadata,
@@ -204,14 +206,19 @@ const create = zodCommand({
       .regex(/^\d+[smhd]$/, "Use a number with a unit: 30m, 12h, 7d")
       .prefault("7d")
       .describe("Time until the job expires, e.g. 12h or 7d"),
+    "fee-token": feeTokenSchema,
   },
   action: async (args, opts) => {
     const json = isJson(create);
     const { agentId, expiresIn } = opts as unknown as { agentId: string; expiresIn: string };
 
-    const result = await createJob(args.description, agentId, expiresIn, json).catch(
-      (error: Error) => error,
-    );
+    const result = await createJob(
+      args.description,
+      agentId,
+      expiresIn,
+      readFeeToken(opts),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -238,7 +245,13 @@ const create = zodCommand({
   },
 });
 
-async function createJob(description: string, agentId: string, expiresIn: string, json: boolean) {
+async function createJob(
+  description: string,
+  agentId: string,
+  expiresIn: string,
+  feeToken: Address | undefined,
+  json: boolean,
+) {
   const agent = await requestJson(
     api.v1.agents[":agentId"].$get({ param: { agentId: requireOnchainAgentId(agentId) } }),
     new CliError(
@@ -270,6 +283,7 @@ async function createJob(description: string, agentId: string, expiresIn: string
   const txHash = await walletClient(session, wallet)
     .writeContract({
       type: "tempo",
+      feeToken,
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "createJob",
@@ -331,6 +345,7 @@ const setBudget = zodCommand({
       .describe("t;TIP-20 payment token address (must be whitelisted by the escrow)"),
     amount: z.string().describe("a;Budget in token units, or raw base units with --as-unit"),
     "as-unit": z.boolean().prefault(false).describe("Treat --amount as raw base units"),
+    "fee-token": feeTokenSchema,
   },
   action: async (args, opts) => {
     const json = isJson(setBudget);
@@ -340,7 +355,7 @@ const setBudget = zodCommand({
     const result = await setJobBudget(
       args.jobId,
       opts.amount,
-      { token: opts.token, unit: asUnit },
+      { token: opts.token, unit: asUnit, feeToken: readFeeToken(opts) },
       json,
     ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
@@ -365,7 +380,7 @@ const setBudget = zodCommand({
 async function setJobBudget(
   jobId: string,
   budget: string,
-  opts: { token: string; unit: boolean },
+  opts: { token: string; unit: boolean; feeToken?: Address },
   json: boolean,
 ) {
   const token = resolveToken(opts.token);
@@ -395,6 +410,7 @@ async function setJobBudget(
   const txHash = await walletClient(await openSession())
     .writeContract({
       type: "tempo",
+      feeToken: opts.feeToken,
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "setBudget",
@@ -425,10 +441,15 @@ const agree = zodCommand({
   args: {
     jobId: z.string().describe("Onchain job id"),
   },
-  action: async (args) => {
+  opts: {
+    "fee-token": feeTokenSchema,
+  },
+  action: async (args, opts) => {
     const json = isJson(agree);
 
-    const result = await agreeJob(args.jobId, json).catch((error: Error) => error);
+    const result = await agreeJob(args.jobId, readFeeToken(opts), json).catch(
+      (error: Error) => error,
+    );
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -451,7 +472,7 @@ const agree = zodCommand({
   },
 });
 
-async function agreeJob(jobId: string, json: boolean) {
+async function agreeJob(jobId: string, feeToken: Address | undefined, json: boolean) {
   const id = requireJobId(jobId);
   const job = await readJob(id);
   if (jobStatuses[job.status] !== "OPEN")
@@ -477,12 +498,21 @@ async function agreeJob(jobId: string, json: boolean) {
   const approveTxHash =
     job.paymentToken === zeroAddress
       ? null
-      : await approveBudget(session, wallet, job.paymentToken, job.budget, metadata, json);
+      : await approveBudget(
+          session,
+          wallet,
+          job.paymentToken,
+          job.budget,
+          metadata,
+          feeToken,
+          json,
+        );
 
   progress(json, `Funding job #${jobId} with ${formatTokenAmount(job.budget, metadata)}…`);
   const txHash = await walletClient(session, wallet)
     .writeContract({
       type: "tempo",
+      feeToken,
       address: escrow,
       abi: erc8183AgenticCommerceAbi,
       functionName: "fund",
@@ -508,6 +538,7 @@ async function approveBudget(
   token: Address,
   budget: bigint,
   metadata: TokenMetadata | null,
+  feeToken: Address | undefined,
   json: boolean,
 ) {
   const escrow = AGENTIC_COMMERCE;
@@ -537,6 +568,7 @@ async function approveBudget(
   const txHash = await walletClient(session, wallet)
     .writeContract({
       type: "tempo",
+      feeToken,
       address: token,
       abi: Abis.tip20,
       functionName: "approve",
@@ -554,10 +586,15 @@ const deliver = zodCommand({
     jobId: z.string().describe("Onchain job id"),
     fileHash: z.string().describe("32-byte content hash committing to the deliverable"),
   },
-  action: async (args) => {
+  opts: {
+    "fee-token": feeTokenSchema,
+  },
+  action: async (args, opts) => {
     const json = isJson(deliver);
 
-    const result = await deliverJob(args.jobId, args.fileHash, json).catch((error: Error) => error);
+    const result = await deliverJob(args.jobId, args.fileHash, readFeeToken(opts), json).catch(
+      (error: Error) => error,
+    );
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -578,7 +615,12 @@ const deliver = zodCommand({
   },
 });
 
-async function deliverJob(jobId: string, fileHash: string, json: boolean) {
+async function deliverJob(
+  jobId: string,
+  fileHash: string,
+  feeToken: Address | undefined,
+  json: boolean,
+) {
   if (!/^0x[0-9a-fA-F]{64}$/.test(fileHash))
     throw new CliError(
       "JOB_INPUT_INVALID",
@@ -590,6 +632,7 @@ async function deliverJob(jobId: string, fileHash: string, json: boolean) {
   const txHash = await walletClient(await openSession())
     .writeContract({
       type: "tempo",
+      feeToken,
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "submit",
@@ -609,13 +652,18 @@ const complete = zodCommand({
   },
   opts: {
     reason: z.string().optional().describe("r;Completion reason (32 bytes max)"),
+    "fee-token": feeTokenSchema,
   },
   action: async (args, opts) => {
     const json = isJson(complete);
 
-    const result = await evaluateJob("complete", args.jobId, opts.reason, json).catch(
-      (error: Error) => error,
-    );
+    const result = await evaluateJob(
+      "complete",
+      args.jobId,
+      opts.reason,
+      readFeeToken(opts),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -642,13 +690,18 @@ const reject = zodCommand({
   },
   opts: {
     reason: z.string().optional().describe("r;Rejection reason (32 bytes max)"),
+    "fee-token": feeTokenSchema,
   },
   action: async (args, opts) => {
     const json = isJson(reject);
 
-    const result = await evaluateJob("reject", args.jobId, opts.reason, json).catch(
-      (error: Error) => error,
-    );
+    const result = await evaluateJob(
+      "reject",
+      args.jobId,
+      opts.reason,
+      readFeeToken(opts),
+      json,
+    ).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -671,12 +724,14 @@ async function evaluateJob(
   action: "complete" | "reject",
   jobId: string,
   reason: string | undefined,
+  feeToken: Address | undefined,
   json: boolean,
 ) {
   progress(json, `Marking job #${jobId} as ${action === "complete" ? "completed" : "rejected"}…`);
   const txHash = await walletClient(await openSession())
     .writeContract({
       type: "tempo",
+      feeToken,
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: action,
@@ -705,10 +760,15 @@ const refund = zodCommand({
   args: {
     jobId: z.string().describe("Onchain job id"),
   },
-  action: async (args) => {
+  opts: {
+    "fee-token": feeTokenSchema,
+  },
+  action: async (args, opts) => {
     const json = isJson(refund);
 
-    const result = await refundJob(args.jobId, json).catch((error: Error) => error);
+    const result = await refundJob(args.jobId, readFeeToken(opts), json).catch(
+      (error: Error) => error,
+    );
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -725,7 +785,7 @@ const refund = zodCommand({
   },
 });
 
-async function refundJob(jobId: string, json: boolean) {
+async function refundJob(jobId: string, feeToken: Address | undefined, json: boolean) {
   const id = requireJobId(jobId);
   const job = await readJob(id);
   const status = jobStatuses[job.status];
@@ -742,6 +802,7 @@ async function refundJob(jobId: string, json: boolean) {
   const txHash = await walletClient(await openSession())
     .writeContract({
       type: "tempo",
+      feeToken,
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "claimRefund",

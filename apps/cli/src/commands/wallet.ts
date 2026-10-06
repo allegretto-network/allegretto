@@ -1,12 +1,14 @@
 import pc from "picocolors";
-import type { Hex } from "viem";
+import type { Address, Hex } from "viem";
 import { Abis } from "viem/tempo";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
 import { openSession, requireWallet } from "../lib/session.ts";
 import {
+  feeTokenSchema,
   formatTokenAmount,
   parseTokenAmount,
+  readFeeToken,
   readTokenMetadata,
   tokenLabel,
 } from "../lib/token.ts";
@@ -106,11 +108,16 @@ const sendTransaction = zodCommand({
       .regex(/^0x[0-9a-fA-F]*$/, "Expected 0x-prefixed hex")
       .optional()
       .describe("d;Calldata as 0x-prefixed hex"),
+    "fee-token": feeTokenSchema,
   },
   action: async (_args, opts) => {
     const json = isJson(sendTransaction);
 
-    const result = await broadcastTransaction(opts).catch((error: Error) => error);
+    const result = await broadcastTransaction({
+      to: opts.to,
+      data: opts.data,
+      feeToken: readFeeToken(opts),
+    }).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -124,7 +131,7 @@ const sendTransaction = zodCommand({
   },
 });
 
-async function broadcastTransaction(opts: { to: string; data?: string }) {
+async function broadcastTransaction(opts: { to: string; data?: string; feeToken?: Address }) {
   const session = await openSession();
   const wallet = requireWallet(session);
 
@@ -132,6 +139,7 @@ async function broadcastTransaction(opts: { to: string; data?: string }) {
   // Tempo's own RPC; Privy only produces the signature.
   const hash = await walletClient(session, wallet).sendTransaction({
     type: "tempo",
+    feeToken: opts.feeToken,
     to: opts.to as Hex,
     ...(opts.data && { data: opts.data as Hex }),
   });
@@ -210,15 +218,16 @@ const transfer = zodCommand({
     to: addressSchema.describe("Recipient address"),
     amount: z.string().describe("a;Amount to send in token units, e.g. 1.5"),
     "as-unit": z.boolean().prefault(false).describe("Treat --amount as raw base units"),
+    "fee-token": feeTokenSchema,
   },
   action: async (_args, opts) => {
     const json = isJson(transfer);
     // commander camelCases --as-unit; zod-commander's opts type keeps the literal key.
     const asUnit = (opts as { asUnit?: boolean }).asUnit === true;
 
-    const result = await transferTokens(opts.token, opts.to, opts.amount, asUnit).catch(
-      (error: Error) => error,
-    );
+    const result = await transferTokens(opts.token, opts.to, opts.amount, asUnit, {
+      feeToken: readFeeToken(opts),
+    }).catch((error: Error) => error);
     if (result instanceof Error) return err(result)(json);
 
     ok(
@@ -229,6 +238,7 @@ const transfer = zodCommand({
           ["To", pc.cyan(result.to)],
           ["Token", tokenLabel(result.token, result.symbol)],
           ["Amount", `${result.formatted} ${pc.dim(`(${result.amount} base units)`)}`],
+          ["Fee Token", tokenLabel(result.feeToken, result.feeSymbol)],
           ["Tx", pc.cyan(result.hash)],
         ]),
       ].join("\n"),
@@ -237,7 +247,13 @@ const transfer = zodCommand({
   },
 });
 
-async function transferTokens(token: string, to: string, amount: string, asUnit: boolean) {
+async function transferTokens(
+  token: string,
+  to: string,
+  amount: string,
+  asUnit: boolean,
+  opts: { feeToken?: Address },
+) {
   const session = await openSession();
   const wallet = requireWallet(session);
   const metadata = await readTokenMetadata(token as Hex);
@@ -263,10 +279,17 @@ async function transferTokens(token: string, to: string, amount: string, asUnit:
       `This wallet holds ${formatTokenAmount(held, metadata)} but tried to send ${formatTokenAmount(wei, metadata)}.`,
     );
 
+  // Paying the fee in the token being sent means a wallet holding only that
+  // token can still transfer it. Tempo would pick the same token for a bare
+  // transfer, but saying so explicitly keeps the fee off an unrelated balance.
+  const feeToken = opts.feeToken ?? (token as Address);
+  const feeMetadata = feeToken === token ? metadata : await readTokenMetadata(feeToken);
+
   // Tempo's transaction type (118) carries a list of calls and lets fees be
   // paid in a TIP-20, so every write asks for it explicitly.
   const hash = await walletClient(session, wallet).writeContract({
     type: "tempo",
+    feeToken,
     address: token as Hex,
     abi: Abis.tip20,
     functionName: "transfer",
@@ -281,6 +304,8 @@ async function transferTokens(token: string, to: string, amount: string, asUnit:
     symbol: metadata?.symbol ?? null,
     amount: wei.toString(),
     formatted: formatTokenAmount(wei, metadata),
+    feeToken,
+    feeSymbol: feeMetadata?.symbol ?? null,
     hash,
   };
 }

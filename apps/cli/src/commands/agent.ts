@@ -7,6 +7,7 @@ import {
 import { erc8004IdentityRegistryAbi } from "@allegretto-network/core/abis/erc8004";
 import pc from "picocolors";
 import { v4 as uuidv4 } from "uuid";
+import type { Address } from "viem";
 import { parseEventLogs } from "viem";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
@@ -27,6 +28,7 @@ import { api, requestJson, requireOnchainAgentId } from "../lib/api.ts";
 import { formatScore } from "../lib/feedback.ts";
 import { openSession, requireUserId, requireWallet } from "../lib/session.ts";
 import type { WalletSession } from "../lib/privy.ts";
+import { feeTokenSchema, readFeeToken } from "../lib/token.ts";
 import { tempoClient, walletClient } from "../lib/viem.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
@@ -710,13 +712,16 @@ const push = zodCommand({
       .boolean()
       .prefault(false)
       .describe("Show what push would do without sending transactions"),
+    "fee-token": feeTokenSchema,
   },
   action: async (args, opts) => {
     const json = isJson(push);
     // commander camelCases --dry-run; zod-commander's opts type keeps the literal key.
     const dryRun = (opts as { dryRun?: boolean }).dryRun === true;
 
-    const result = await pushAgent(args.agentId, dryRun, json).catch((error: Error) => error);
+    const result = await pushAgent(args.agentId, dryRun, readFeeToken(opts), json).catch(
+      (error: Error) => error,
+    );
     if (result instanceof Error) return err(result)(json);
 
     if (result.dryRun)
@@ -764,7 +769,12 @@ const push = zodCommand({
   },
 });
 
-async function pushAgent(agentId: string, dryRun: boolean, json: boolean) {
+async function pushAgent(
+  agentId: string,
+  dryRun: boolean,
+  feeToken: Address | undefined,
+  json: boolean,
+) {
   const userId = await requireUserId();
   const card = await readAgentCard(userId, agentId);
   const session = await openSession();
@@ -787,7 +797,7 @@ async function pushAgent(agentId: string, dryRun: boolean, json: boolean) {
 
   const registered = existing
     ? { registration: existing, txHash: null }
-    : await registerAgent(session, wallet, agentRegistry, json);
+    : await registerAgent(session, wallet, agentRegistry, feeToken, json);
 
   // The onchain id is persisted before setAgentURI so a failure there cannot
   // orphan the registration; re-running push then skips register().
@@ -804,6 +814,7 @@ async function pushAgent(agentId: string, dryRun: boolean, json: boolean) {
   progress(json, `Setting agent URI (${agentUri.length} bytes)…`);
   const setUriTxHash = await walletClient(session, wallet).writeContract({
     type: "tempo",
+    feeToken,
     address: IDENTITY_REGISTRY,
     abi: erc8004IdentityRegistryAbi,
     functionName: "setAgentURI",
@@ -831,11 +842,13 @@ async function registerAgent(
   session: WalletSession,
   wallet: Wallet,
   agentRegistry: string,
+  feeToken: Address | undefined,
   json: boolean,
 ) {
   progress(json, "Registering agent onchain…");
   const txHash = await walletClient(session, wallet).writeContract({
     type: "tempo",
+    feeToken,
     address: IDENTITY_REGISTRY,
     abi: erc8004IdentityRegistryAbi,
     functionName: "register",

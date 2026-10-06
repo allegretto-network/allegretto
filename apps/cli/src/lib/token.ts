@@ -1,11 +1,29 @@
 import pc from "picocolors";
 import { type Address, formatUnits, parseUnits } from "viem";
+import { z } from "zod";
 import type { ErrorCode } from "../utils/errors.ts";
 import { CliError } from "../utils/errors.ts";
 import { getCached, setCached } from "./cache.ts";
 import { tempoClient } from "./viem.ts";
 
 export type TokenMetadata = { decimals: number; symbol: string };
+
+/**
+ * `--fee-token` for any onchain write. Tempo has no native gas token, so fees
+ * come out of a TIP-20; left unset, Tempo's own fee-token preference rules pick
+ * one, falling back to pathUSD.
+ */
+export const feeTokenSchema = z
+  .string()
+  .regex(/^0x[0-9a-fA-F]{40}$/, "Expected a 0x-prefixed address")
+  .optional()
+  .describe("TIP-20 token to pay Tempo fees in");
+
+// commander camelCases --fee-token; zod-commander's opts type keeps the literal
+// key, so every caller reads it back through here.
+export function readFeeToken(opts: object): Address | undefined {
+  return (opts as { feeToken?: Address }).feeToken;
+}
 
 /**
  * Reads a token's decimals and symbol, cached forever per address since both
