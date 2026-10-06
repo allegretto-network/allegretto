@@ -1,6 +1,5 @@
 import pc from "picocolors";
-import { createPublicClient, createWalletClient, type Hex, http } from "viem";
-import { tempo } from "viem/chains";
+import type { Hex } from "viem";
 import { Abis } from "viem/tempo";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
@@ -11,7 +10,7 @@ import {
   readTokenMetadata,
   tokenLabel,
 } from "../lib/token.ts";
-import { toWalletAccount } from "../lib/viem.ts";
+import { tempoClient, toWalletAccount, walletClient } from "../lib/viem.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
 import { err, fields, isJson, ok, success } from "../utils/result.ts";
@@ -131,11 +130,8 @@ async function broadcastTransaction(opts: { to: string; data?: string }) {
 
   // viem prepares the transaction (nonce, gas, fees) and broadcasts it against
   // Tempo's own RPC; Privy only produces the signature.
-  const hash = await createWalletClient({
-    account: toWalletAccount(session, wallet),
-    chain: tempo,
-    transport: http(),
-  }).sendTransaction({
+  const hash = await walletClient(session, wallet).sendTransaction({
+    type: "tempo",
     to: opts.to as Hex,
     ...(opts.data && { data: opts.data as Hex }),
   });
@@ -187,10 +183,9 @@ const balance = zodCommand({
 async function readTokenBalance(token: string) {
   const session = await openSession();
   const wallet = requireWallet(session);
-  const client = createPublicClient({ chain: tempo, transport: http() });
 
   const [wei, metadata] = await Promise.all([
-    client.readContract({
+    tempoClient.readContract({
       address: token as Hex,
       abi: Abis.tip20,
       functionName: "balanceOf",
@@ -245,7 +240,6 @@ const transfer = zodCommand({
 async function transferTokens(token: string, to: string, amount: string, asUnit: boolean) {
   const session = await openSession();
   const wallet = requireWallet(session);
-  const client = createPublicClient({ chain: tempo, transport: http() });
   const metadata = await readTokenMetadata(token as Hex);
   if (!asUnit && !metadata)
     throw new CliError(
@@ -257,7 +251,7 @@ async function transferTokens(token: string, to: string, amount: string, asUnit:
   // The guard above means metadata is non-null whenever decimals matter, so the
   // fallback is only there to satisfy the signature.
   const wei = parseTokenAmount(amount, asUnit, metadata?.decimals ?? 0, "AMOUNT_INVALID");
-  const held = await client.readContract({
+  const held = await tempoClient.readContract({
     address: token as Hex,
     abi: Abis.tip20,
     functionName: "balanceOf",
@@ -269,17 +263,16 @@ async function transferTokens(token: string, to: string, amount: string, asUnit:
       `This wallet holds ${formatTokenAmount(held, metadata)} but tried to send ${formatTokenAmount(wei, metadata)}.`,
     );
 
-  const hash = await createWalletClient({
-    account: toWalletAccount(session, wallet),
-    chain: tempo,
-    transport: http(),
-  }).writeContract({
+  // Tempo's transaction type (118) carries a list of calls and lets fees be
+  // paid in a TIP-20, so every write asks for it explicitly.
+  const hash = await walletClient(session, wallet).writeContract({
+    type: "tempo",
     address: token as Hex,
     abi: Abis.tip20,
     functionName: "transfer",
     args: [to as Hex, wei],
   });
-  await client.waitForTransactionReceipt({ hash });
+  await tempoClient.waitForTransactionReceipt({ hash });
 
   return {
     from: wallet.address,

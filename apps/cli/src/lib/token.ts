@@ -1,10 +1,9 @@
 import pc from "picocolors";
-import { type Address, createPublicClient, formatUnits, http, parseUnits } from "viem";
-import { tempo } from "viem/chains";
-import { Abis } from "viem/tempo";
+import { type Address, formatUnits, parseUnits } from "viem";
 import type { ErrorCode } from "../utils/errors.ts";
 import { CliError } from "../utils/errors.ts";
 import { getCached, setCached } from "./cache.ts";
+import { tempoClient } from "./viem.ts";
 
 export type TokenMetadata = { decimals: number; symbol: string };
 
@@ -18,13 +17,11 @@ export async function readTokenMetadata(token: Address): Promise<TokenMetadata |
   const cached = getCached<TokenMetadata>("token-metadata", key);
   if (cached) return cached;
 
-  const client = createPublicClient({ chain: tempo, transport: http() });
-  const contract = { address: token, abi: Abis.tip20 } as const;
-  const metadata = await Promise.all([
-    client.readContract({ ...contract, functionName: "decimals" }),
-    client.readContract({ ...contract, functionName: "symbol" }),
-  ])
-    .then(([decimals, symbol]) => ({ decimals, symbol }))
+  // Tempo's token action reads the whole TIP-20 metadata set in one deployless
+  // multicall, and answers from viem's Tempo token list for known tokens.
+  const metadata = await tempoClient.token
+    .getMetadata({ token })
+    .then(({ decimals, symbol }) => ({ decimals, symbol }))
     .catch(() => null);
 
   if (metadata) setCached("token-metadata", key, metadata);

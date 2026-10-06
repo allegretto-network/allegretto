@@ -2,16 +2,7 @@ import { AGENTIC_COMMERCE, REPUTATION_REGISTRY, type Wallet } from "@allegretto-
 import { erc8004ReputationRegistryAbi } from "@allegretto-network/core/abis/erc8004";
 import { erc8183AgenticCommerceAbi } from "@allegretto-network/core/abis/erc8183";
 import pc from "picocolors";
-import {
-  type Address,
-  createPublicClient,
-  createWalletClient,
-  http,
-  isAddress,
-  parseEventLogs,
-  zeroAddress,
-} from "viem";
-import { tempo } from "viem/chains";
+import { type Address, isAddress, parseEventLogs, zeroAddress } from "viem";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
 import { api, requestJson, requireOnchainAgentId } from "../lib/api.ts";
@@ -21,9 +12,8 @@ import {
   resolveFeedbackDocument,
   toFeedbackUri,
 } from "../lib/feedback.ts";
-import type { WalletSession } from "../lib/privy.ts";
 import { openSession, requireWallet } from "../lib/session.ts";
-import { toWalletAccount } from "../lib/viem.ts";
+import { tempoClient, walletClient } from "../lib/viem.ts";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
 import { err, fields, formatRelative, isJson, ok, shortAddress, success } from "../utils/result.ts";
@@ -66,7 +56,7 @@ const give = zodCommand({
       return ok(
         fields([
           ["Agent", `${pc.bold(result.agentName)} ${pc.dim(`(#${result.agentId})`)}`],
-          ["Chain", pc.bold(tempo.name)],
+          ["Chain", pc.bold(tempoClient.chain.name)],
           ["Wallet", pc.cyan(result.client)],
           ["Registry", result.registry],
           ["Score", `★ ${formatScore(result.score)}`],
@@ -156,6 +146,7 @@ async function giveFeedback(
   progress(json, `Giving feedback to agent #${agentId}…`);
   const txHash = await walletClient(session, wallet)
     .writeContract({
+      type: "tempo",
       address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "giveFeedback",
@@ -387,6 +378,7 @@ async function revokeFeedback(agentId: string, index: number, json: boolean) {
   progress(json, `Revoking feedback #${index} on agent #${agentId}…`);
   const txHash = await walletClient(session, wallet)
     .writeContract({
+      type: "tempo",
       address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "revokeFeedback",
@@ -465,6 +457,7 @@ async function respondToFeedback(
   progress(json, `Responding to feedback #${index} on agent #${agentId}…`);
   const txHash = await walletClient(await openSession())
     .writeContract({
+      type: "tempo",
       address: REPUTATION_REGISTRY,
       abi: erc8004ReputationRegistryAbi,
       functionName: "appendResponse",
@@ -519,15 +512,7 @@ function agentNotFound(agentId: string): CliError {
 }
 
 function publicClient() {
-  return createPublicClient({ chain: tempo, transport: http() });
-}
-
-function walletClient(session: WalletSession, wallet: Wallet = requireWallet(session)) {
-  return createWalletClient({
-    account: toWalletAccount(session, wallet),
-    chain: tempo,
-    transport: http(),
-  });
+  return tempoClient;
 }
 
 // The reputation registry reverts with require strings rather than custom

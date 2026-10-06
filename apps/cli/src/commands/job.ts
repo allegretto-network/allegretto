@@ -1,18 +1,7 @@
 import { AGENTIC_COMMERCE, type Wallet } from "@allegretto-network/core";
 import { erc8183AgenticCommerceAbi } from "@allegretto-network/core/abis/erc8183";
 import pc from "picocolors";
-import {
-  type Address,
-  createPublicClient,
-  createWalletClient,
-  http,
-  isAddress,
-  parseEventLogs,
-  stringToHex,
-  zeroAddress,
-  zeroHash,
-} from "viem";
-import { tempo } from "viem/chains";
+import { type Address, isAddress, parseEventLogs, stringToHex, zeroAddress, zeroHash } from "viem";
 import { Abis } from "viem/tempo";
 import { z } from "zod";
 import { zodCommand } from "zod-commander";
@@ -26,7 +15,7 @@ import {
   tokenLabel,
   type TokenMetadata,
 } from "../lib/token.ts";
-import { toWalletAccount } from "../lib/viem.ts";
+import { tempoClient, walletClient } from "../lib/viem.ts";
 import { CliError } from "../utils/errors.ts";
 import {
   err,
@@ -280,6 +269,7 @@ async function createJob(description: string, agentId: string, expiresIn: string
   progress(json, `Creating job for agent #${agentId}…`);
   const txHash = await walletClient(session, wallet)
     .writeContract({
+      type: "tempo",
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "createJob",
@@ -404,6 +394,7 @@ async function setJobBudget(
   progress(json, `Setting budget on job #${jobId}…`);
   const txHash = await walletClient(await openSession())
     .writeContract({
+      type: "tempo",
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "setBudget",
@@ -491,6 +482,7 @@ async function agreeJob(jobId: string, json: boolean) {
   progress(json, `Funding job #${jobId} with ${formatTokenAmount(job.budget, metadata)}…`);
   const txHash = await walletClient(session, wallet)
     .writeContract({
+      type: "tempo",
       address: escrow,
       abi: erc8183AgenticCommerceAbi,
       functionName: "fund",
@@ -544,6 +536,7 @@ async function approveBudget(
   progress(json, `Approving ${formatTokenAmount(budget, metadata)} for the escrow…`);
   const txHash = await walletClient(session, wallet)
     .writeContract({
+      type: "tempo",
       address: token,
       abi: Abis.tip20,
       functionName: "approve",
@@ -596,6 +589,7 @@ async function deliverJob(jobId: string, fileHash: string, json: boolean) {
   progress(json, `Submitting deliverable for job #${jobId}…`);
   const txHash = await walletClient(await openSession())
     .writeContract({
+      type: "tempo",
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "submit",
@@ -682,6 +676,7 @@ async function evaluateJob(
   progress(json, `Marking job #${jobId} as ${action === "complete" ? "completed" : "rejected"}…`);
   const txHash = await walletClient(await openSession())
     .writeContract({
+      type: "tempo",
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: action,
@@ -746,6 +741,7 @@ async function refundJob(jobId: string, json: boolean) {
   progress(json, `Claiming refund for job #${jobId}…`);
   const txHash = await walletClient(await openSession())
     .writeContract({
+      type: "tempo",
       address: AGENTIC_COMMERCE,
       abi: erc8183AgenticCommerceAbi,
       functionName: "claimRefund",
@@ -786,15 +782,7 @@ async function readJob(jobId: bigint) {
 }
 
 function publicClient() {
-  return createPublicClient({ chain: tempo, transport: http() });
-}
-
-function walletClient(session: WalletSession, wallet: Wallet = requireWallet(session)) {
-  return createWalletClient({
-    account: toWalletAccount(session, wallet),
-    chain: tempo,
-    transport: http(),
-  });
+  return tempoClient;
 }
 
 // The ABI lets viem decode custom errors on gas estimation, so failed
