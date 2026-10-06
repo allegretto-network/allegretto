@@ -4,7 +4,7 @@ import { hc } from "hono/client";
 import type { ClientResponse } from "hono/client";
 import { CliError } from "../utils/errors.ts";
 
-export const api = hc<ApiClientType>(ALLEGRETTO_API_URL);
+export const api = hc<ApiClientType>(process.env.ALLEGRETTO_API_URL || ALLEGRETTO_API_URL);
 
 type SuccessJson<R> =
   R extends ClientResponse<infer T, infer S, "json"> ? (S extends 200 ? T : never) : never;
