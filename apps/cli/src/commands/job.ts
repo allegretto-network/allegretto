@@ -196,8 +196,8 @@ function statusLabel(status: string, width: number): string {
 
 function counterparty(job: JobSummary, assigned: boolean): string {
   if (assigned)
-    return `from ${shortAddress(job.client)}${job.agentId ? ` for agent #${job.agentId}` : ""}`;
-  if (job.agentId) return `agent #${job.agentId}`;
+    return `from ${shortAddress(job.client)}${job.agent ? ` for agent #${job.agent.id}` : ""}`;
+  if (job.agent) return `agent #${job.agent.id}`;
   if (job.provider) return `provider ${shortAddress(job.provider)}`;
   return "unassigned";
 }

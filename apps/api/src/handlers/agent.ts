@@ -4,7 +4,7 @@ import { problemDetails } from "hono-problem-details";
 
 import { IDENTITY_REGISTRY, TEMPO_CHAIN_ID } from "@allegretto-network/core";
 
-import { AgentSummaryFragment } from "../lib/subgraphs/__generated/erc-8004";
+import { AgentSummaryFragment } from "../lib/mesh/__generated/sdk";
 import { Env } from "../env";
 import { agentEntityId } from "../utils/agent";
 import { parseTimestamp } from "../utils/timestamp";
@@ -171,7 +171,7 @@ export const agentHandlers = new OpenAPIHono<Env>()
     const text = query.q && /\w/.test(query.q) ? toFulltextQuery(query.q) : "";
     const agents = text
       ? (
-          await c.var.erc8004.SearchAgentProfiles({
+          await c.var.mesh.SearchAgentProfiles({
             text,
             first: query.limit,
             skip: query.skip,
@@ -181,7 +181,7 @@ export const agentHandlers = new OpenAPIHono<Env>()
           })
         ).agentProfileSearch.map((profile) => profile.agent)
       : (
-          await c.var.erc8004.ListAgents({
+          await c.var.mesh.ListAgents({
             first: query.limit,
             skip: query.skip,
             where: {
@@ -201,7 +201,7 @@ export const agentHandlers = new OpenAPIHono<Env>()
   .openapi(getAgentRoute, async (c) => {
     const agentId = c.req.valid("param").agentId.toString();
 
-    const { agents } = await c.var.erc8004.GetAgent({ id: entityId(agentId) });
+    const { agents } = await c.var.mesh.GetAgent({ id: entityId(agentId) });
     const [agent] = agents;
 
     if (!agent) throw notFound(agentId);
@@ -217,7 +217,7 @@ export const agentHandlers = new OpenAPIHono<Env>()
   .openapi(listAgentServicesRoute, async (c) => {
     const agentId = c.req.valid("param").agentId.toString();
 
-    const { agents } = await c.var.erc8004.GetAgentServices({ id: entityId(agentId) });
+    const { agents } = await c.var.mesh.GetAgentServices({ id: entityId(agentId) });
     const [agent] = agents;
 
     if (!agent) throw notFound(agentId);
@@ -253,7 +253,7 @@ export const agentHandlers = new OpenAPIHono<Env>()
       ...(query.client ? [{ client: query.client.toLowerCase() }] : []),
       ...(query.tag ? [{ or: [{ tag1: query.tag }, { tag2: query.tag }] }] : []),
     ];
-    const { agents } = await c.var.erc8004.GetAgentFeedbacks({
+    const { agents } = await c.var.mesh.GetAgentFeedbacks({
       id: entityId(agentId),
       first: query.limit,
       skip: query.skip,
