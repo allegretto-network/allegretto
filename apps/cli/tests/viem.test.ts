@@ -34,10 +34,7 @@ type Serializable = Parameters<typeof serialize>[0];
  * with a local key.
  */
 async function signLike(transaction: Record<string, unknown>) {
-  const presign = transaction.feePayerSignature
-    ? { ...transaction, feePayerSignature: null }
-    : transaction;
-  const digest = keccak256(await serialize(presign as unknown as Serializable));
+  const digest = keccak256(await serialize(transaction as unknown as Serializable));
   const signature = await privateKeyToAccount(key).sign({ hash: digest });
 
   return {
