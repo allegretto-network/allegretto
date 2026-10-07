@@ -82,19 +82,13 @@ export function toWalletAccount(session: WalletSession, wallet: Wallet) {
       const serialize = (options?.serializer ??
         Chain.tempo.serializers.transaction) as typeof Chain.tempo.serializers.transaction;
       // viem types the transaction as a union spanning every chain's shape,
-      // which hides the Tempo fee-payer fields read below.
-      const tempoTransaction = transaction as Parameters<typeof serialize>[0] & {
-        feePayerSignature?: unknown;
-      };
+      // so pin it to the Tempo serializer's own parameter type.
+      const tempoTransaction = transaction as Parameters<typeof serialize>[0];
 
-      // A pre-filled fee-payer signature is not part of what the sender signs:
-      // null marks the envelope as awaiting sponsorship so the digest matches
-      // the one the fee payer later countersigns.
-      const payload = await serialize(
-        tempoTransaction.feePayerSignature
-          ? { ...tempoTransaction, feePayerSignature: null }
-          : tempoTransaction,
-      );
+      // viem's serializer hashes the unsigned payload — signature slots are
+      // excluded — so a pre-filled fee-payer signature never changes what the
+      // sender signs: sender and fee payer countersign the same digest.
+      const payload = await serialize(tempoTransaction);
 
       return serialize(
         tempoTransaction,

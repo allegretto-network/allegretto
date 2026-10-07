@@ -49,24 +49,21 @@ async function signLike(transaction: Record<string, unknown>) {
   };
 }
 
-// The sender signs the envelope with the fee-payer slot empty: their digest
-// excludes the fee payer's signature, so the fee payer signs the very same
-// payload afterwards.
-test("signs the envelope excluding the fee payer's signature", async () => {
+// The sender's digest is the serializer's unsigned payload, so a pre-filled
+// fee-payer signature must not change it: sender and fee payer countersign
+// the same payload (TIP-76). This pins the serializer behavior the adapter's
+// sponsorship path relies on.
+test("the fee payer's signature does not change what the sender signs", async () => {
   const feePayerKey = keccak256("0xf33d");
   const feePayerSignature = parseSignature(
     await privateKeyToAccount(feePayerKey).sign({ hash: keccak256("0xbeef") }),
   );
-  const sponsored = { ...prepared, feePayer: true, from: recipient, feePayerSignature };
-  const { digest } = await signLike(sponsored);
+  const sponsored = { ...prepared, feePayer: true, from: recipient };
+  const digest = keccak256(await serialize(sponsored as unknown as Serializable));
 
-  // The sender's digest is the envelope with the fee-payer slot empty. The
-  // final broadcast envelope — both signatures, sender committed to nothing
-  // about the fee payer's — is a different serialization of the same fields.
-  const senderSignature = parseSignature(await privateKeyToAccount(key).sign({ hash: digest }));
-  expect(digest).not.toBe(
-    keccak256(await serialize(sponsored as unknown as Serializable, senderSignature)),
-  );
+  expect(
+    keccak256(await serialize({ ...sponsored, feePayerSignature } as unknown as Serializable)),
+  ).toBe(digest);
 });
 
 test("recovers the wallet address from the signed digest", async () => {
