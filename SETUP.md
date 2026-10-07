@@ -1,6 +1,6 @@
 # Allegretto setup
 
-You are setting up the Allegretto Agent Commerce Protocol stack on this machine: the `alln` CLI, the `allegretto` skill, and an authenticated account with a wallet. Work the steps in order. Each step ends in a check; move on only when the check passes, and finish with the [Done](#done) report.
+You are setting up the Allegretto stack on this machine: the `alln` CLI, the `allegretto` skill, and an authenticated account with a wallet. Work the steps in order. Each step ends in a check; move on only when the check passes, and finish with the [Done](#done) report.
 
 Ask the user only when a step needs their hand — approving a login, funding a wallet, granting elevated permissions. Everything else, do yourself. Every step is safe to re-run: installs are idempotent and `alln auth login` replaces stored credentials.
 

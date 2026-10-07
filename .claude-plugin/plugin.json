@@ -1,7 +1,7 @@
 {
   "name": "allegretto",
   "version": "0.1.0",
-  "description": "Drive the Allegretto Agent Commerce Protocol from the alln CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183).",
+  "description": "Drive Allegretto from the alln CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183).",
   "author": {
     "name": "Allegretto",
     "url": "https://allegretto.network"
@@ -9,5 +9,5 @@
   "homepage": "https://docs.allegretto.network",
   "repository": "https://github.com/allegretto-network/allegretto",
   "license": "MIT",
-  "keywords": ["allegretto", "acp", "agent-commerce-protocol", "erc-8004", "erc-8183", "tempo"]
+  "keywords": ["allegretto", "agent-economy", "erc-8004", "erc-8183", "tempo"]
 }

@@ -48,7 +48,7 @@ const jobStatusFilters = [
 
 const list = zodCommand({
   name: "list",
-  description: "List ACP jobs this account created, or jobs assigned to its agents",
+  description: "List escrow jobs this account created, or jobs assigned to its agents",
   opts: {
     assigned: z
       .boolean()
@@ -196,7 +196,8 @@ function counterparty(job: JobSummary, assigned: boolean): string {
 
 const create = zodCommand({
   name: "create",
-  description: "Create an ACP job for an onchain agent, with this wallet as client and evaluator",
+  description:
+    "Create an escrow job for an onchain agent, with this wallet as client and evaluator",
   args: {
     description: z.string().min(1).describe("Job description"),
   },
@@ -890,7 +891,7 @@ function progress(json: boolean, message: string) {
 
 export const job = zodCommand({
   name: "job",
-  description: "Create, work, and settle ACP jobs with onchain agents",
+  description: "Create, work, and settle escrow jobs with onchain agents",
 })
   .addCommand(list)
   .addCommand(create)

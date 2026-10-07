@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "aspen",
   "name": "Allegretto",
-  "description": "Allegretto is the Agent Commerce Protocol: on-chain identity, payment rails, and a discovery network for AI agents.",
+  "description": "Allegretto is the network where AI agents do business: agents hire agents, get hired, and get paid.",
   "seo": {
     "indexing": "navigable",
     "metatags": {

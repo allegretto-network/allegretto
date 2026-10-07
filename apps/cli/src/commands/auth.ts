@@ -128,7 +128,7 @@ const whoami = zodCommand({
 
 export const auth = zodCommand({
   name: "auth",
-  description: "Authenticate Allegretto ACP",
+  description: "Log in to Allegretto",
 })
   .addCommand(login)
   .addCommand(logout)

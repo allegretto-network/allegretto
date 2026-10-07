@@ -1,21 +1,21 @@
 ---
 title: "Direct"
-description: "Settle a payment for each request over MPP on Tempo. No account, no API key."
+description: "Pay per call: your agent pays exactly what a request costs. No account, no API key, no top-up."
 ---
 
-The direct rail settles a payment for each request, using [MPP](https://mpp.dev) — the Machine Payments Protocol, an open standard for HTTP 402 payments — settling on [Tempo](https://tempo.xyz). There is no account, no API key, and no prepaid balance. The wallet that signs the payment is the customer.
+The direct rail settles a payment for each request. There is no account to open, no API key to issue, and no prepaid balance: the wallet that signs the payment is the customer, and the price is whatever the service says in the moment.
 
-## How a payment works
+It is built on [MPP](https://mpp.dev), the Machine Payments Protocol — an open standard for HTTP 402 payments — settling on [Tempo](https://tempo.xyz). Here is the flow:
 
 <Steps>
   <Step title="Request without payment">
     The client calls the service like any HTTP API. The service responds with status `402 Payment
-    Required` and a Challenge in the `WWW-Authenticate` header naming the amount, the TIP-20
-    stablecoin, the recipient, and the payment method it accepts.
+    Required` and a Challenge in the `WWW-Authenticate` header naming the amount, the stablecoin,
+    the recipient, and the payment method it accepts.
   </Step>
   <Step title="Sign">
-    The client signs the payment with its wallet. A Tempo charge is a signed TIP-20 transfer bound
-    to the Challenge, so the amount and recipient cannot be changed after the service issued it.
+    The client signs the payment with its wallet. A Tempo charge is a signed transfer bound to the
+    Challenge, so the amount and recipient cannot be changed after the service issued it.
   </Step>
   <Step title="Retry">
     The client resends the request with a Credential carrying that proof. The service verifies it,
@@ -46,11 +46,11 @@ alln mpp fetch https://api.example.com/weather              # settle it and prin
 
 ## Settlement
 
-Payments settle in Tempo stablecoins, which are [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/overview) tokens. The service picks which one it accepts and names it in the Challenge, so a client never has to guess. Tempo has no native token, settles with deterministic finality in roughly 500ms, and lets the service sponsor the transaction fee, so a wallet holding only the stablecoin it pays with needs nothing else.
+Payments settle in USD-denominated stablecoins on Tempo. Tempo reaches deterministic finality in roughly 500ms and lets the service sponsor the transaction fee, so a wallet holding only the stablecoin it pays with needs nothing else. The service picks which stablecoin it accepts and names it in the Challenge, so a client never has to guess.
 
-## TIP-20 tokens
+## The stablecoins
 
-Every token below is a USD-denominated Tempo TIP-20 and uses 6 decimals. The Challenge names the one a service accepts, so a client never picks in advance. Most [MPP catalog](https://mpp.dev/services) endpoints currently price in `USDC.e` or `pathUSD`.
+Every token below is a USD-denominated stablecoin on Tempo, issued as a [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/overview) token with 6 decimals. The Challenge names the one a service accepts, so a client never picks in advance. Most [MPP catalog](https://mpp.dev/services) endpoints currently price in `USDC.e` or `pathUSD`.
 
 | Token     | Name                    | Address                                      |
 | --------- | ----------------------- | -------------------------------------------- |

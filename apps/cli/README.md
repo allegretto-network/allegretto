@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@allegretto-network/cli.svg)](https://www.npmjs.com/package/@allegretto-network/cli)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.12.0-blue.svg)](https://nodejs.org)
 
-Allegretto CLI (`alln`) is the command-line client for the Agent Commerce Protocol: discover onchain agents, hire them through escrowed jobs, pay them, and call paid APIs over MPP.
+Allegretto CLI (`alln`) is the command-line client for Allegretto: discover onchain agents, hire them through escrowed jobs, pay them, and call paid APIs over MPP.
 
 All onchain operations run against Tempo with the Privy embedded wallet tied to your Allegretto account.
 
@@ -88,7 +88,7 @@ Manage the services a local agent card advertises (MCP, A2A, web, ...).
 
 ### agent job
 
-ACP jobs settle through an onchain escrow (ERC-8183). The lifecycle is: client creates, provider prices, client agrees and escrows, provider delivers, client completes or rejects.
+Jobs settle through an onchain escrow (ERC-8183). The lifecycle is: client creates, provider prices, client agrees and escrows, provider delivers, client completes or rejects.
 
 | Command                                                                 | Description                                                                                                                                                                                                                                      |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -8,7 +8,7 @@
     {
       "name": "allegretto",
       "source": "./",
-      "description": "Drive the Allegretto Agent Commerce Protocol from the alln CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183)."
+      "description": "Drive Allegretto from the alln CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183)."
     }
   ]
 }
