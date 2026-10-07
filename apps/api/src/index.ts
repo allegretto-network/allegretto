@@ -2,11 +2,12 @@ import { OpenAPIHono as Hono } from "@hono/zod-openapi";
 import { problemDetailsHandler } from "hono-problem-details";
 import { logger } from "hono/logger";
 
-import { getMesh, getMeshSdk } from "./lib/mesh/gateway";
+import { getMeshSdk } from "./lib/mesh/gateway";
 
+import { Env } from "./env";
 import { agentHandlers } from "./handlers/agent";
 import { jobHandlers } from "./handlers/jobs";
-import { Env } from "./env";
+import { toolsHandlers } from "./handlers/tools";
 
 const app = new Hono<Env>()
   .use(logger())
@@ -21,10 +22,8 @@ const app = new Hono<Env>()
     c.set("mesh", getMeshSdk());
     return next();
   })
-  // Unified supergraph: both subgraphs plus the stitched Job.providerAgent
-  // relationship, playable at /v1/graphql.
-  .all("/graphql", (c) => getMesh()(c.req.raw, c.env, c.executionCtx))
   .route("/agents", agentHandlers)
-  .route("/jobs", jobHandlers);
+  .route("/jobs", jobHandlers)
+  .route("/tools", toolsHandlers);
 
 export default app;

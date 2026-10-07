@@ -118,14 +118,15 @@ Onchain feedback follows the ERC-8004 reputation registry. `<agentId>` is the on
 
 `alln mpp` finds and calls APIs that charge per request over [MPP](https://mpp.dev). No account or API key: the wallet that signs the payment is the customer.
 
-| Command                     | Description                                                                                                              |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `alln mpp discover <query>` | Search the MPP catalog for payable endpoints. `--limit/-l` (default 20), `--skip` to page, `--refresh` to skip the cache |
-| `alln mpp fetch <endpoint>` | Call an endpoint, settling its `402` Challenge from the active wallet                                                    |
+| Command                     | Description                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `alln mpp discover <query>` | Search payable endpoints, described in natural language. `--limit/-l` (default 20, max 50) |
+| `alln mpp fetch <endpoint>` | Call an endpoint, settling its `402` Challenge from the active wallet                      |
+| `alln mpp quote <endpoint>` | Print the price an endpoint charges, without paying it (no wallet needed)                  |
 
-`fetch` takes curl-style flags: `--method/-X` (defaults to `GET`, or `POST` with a body), `--header/-H "Name: value"`, `--query/-q key=value`, `--data/-d <body or @path>`, and `--form/-F key=value or key=@path`. `--data` and `--form` cannot both carry the body, and either one implies `POST`. Repeat a flag to send it more than once.
+`fetch` and `quote` take curl-style flags: `--method/-X` (defaults to `GET`, or `POST` with a body), `--header/-H "Name: value"`, `--query/-q key=value`, `--data/-d <body or @path>`, and `--form/-F key=value or key=@path`. `--data` and `--form` cannot both carry the body, and either one implies `POST`. Repeat a flag to send it more than once.
 
-A call spends real money, so two flags guard it: `--inspect` reports the Challenge and pays nothing (no wallet needed), and `--max-amount <amount>` refuses any Challenge above that price before signing. The response body goes to stdout; the payment notice goes to stderr.
+A call spends real money, so `quote` first when unsure: an endpoint can quote one price per currency it accepts, and `quote` prints every one of them. `fetch` pays its default offer, or the currency picked with `--token/-t <address>`. The response body goes to stdout; the payment notice goes to stderr.
 
 ### wallet
 

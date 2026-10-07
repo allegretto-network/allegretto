@@ -10,12 +10,12 @@ import { z } from "zod";
 import { CliError } from "../utils/errors.ts";
 import { jsonStringSchema } from "../utils/json.ts";
 import { openSession, requireWallet } from "./session.ts";
-import { parseTokenAmount, readTokenMetadata } from "./token.ts";
+import { readTokenMetadata } from "./token.ts";
 import { toWalletAccount } from "./viem.ts";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
-/** The curl-style flags `alln mpp fetch` accepts, each already collected. */
+/** The curl-style flags `alln mpp fetch` and `alln mpp quote` accept. */
 export type RequestOptions = {
   method?: string;
   header?: string[];
@@ -25,82 +25,182 @@ export type RequestOptions = {
 };
 
 /**
- * Calls an endpoint, settling its `402` Challenge when there is one.
- *
- * `inspect` stops after the Challenge is read, so the terms can be reported
- * without a wallet or a payment. `maxAmount` is a ceiling in token units: a
- * Challenge asking for more is refused before anything is signed.
+ * One price an endpoint offers: the Challenge's amount in one of the
+ * currencies it accepts.
  */
-export async function callEndpoint(
-  endpoint: string,
-  opts: RequestOptions & { inspect: boolean; maxAmount?: string },
-) {
-  const request = await toRequest(endpoint, opts);
+export type Quote = {
+  /** Base-unit amount as the Challenge named it. */
+  amount: string;
+  currency: Address;
+  symbol: string | null;
+  /** "0.02 USDC.e", or "0.02" when only the Challenge's decimals are known. */
+  formatted: string;
+};
 
-  // polyfill: false keeps globalThis.fetch untouched, so the catalog and every
-  // other request in the process stay on the stock fetch. The account is left
-  // unset because reading a Challenge needs no wallet — the Privy session only
-  // opens once a payment is actually signed.
-  const mppx = Mppx.create({
-    methods: [tempo.charge({ expectedChainId: TEMPO_CHAIN_ID })],
-    polyfill: false,
-  });
+/**
+ * Calls an endpoint, settling its `402` Challenge when there is one. `token`
+ * picks which offered currency to pay in when the endpoint quotes several.
+ */
+export async function callEndpoint(endpoint: string, opts: RequestOptions & { token?: Address }) {
+  const { url, payment, prepared } = await prepare(endpoint, opts);
 
-  const prepared = await mppx
-    .prepareRequest(request.url, request.init)
-    .catch(rethrowPayment(`prepare a request to ${endpoint}`));
-
-  if (!prepared.payment) {
-    if (opts.inspect) return { endpoint: request.url, payment: null, response: null };
-    return { endpoint: request.url, payment: null, response: await read(prepared.response) };
-  }
-
-  const payment = await describeChallenge(prepared.payment.challenge);
-  if (opts.inspect) return { endpoint: request.url, payment, response: null };
-
-  assertWithinMaxAmount(payment, opts.maxAmount);
+  if (!prepared.payment || !payment)
+    return { endpoint: url, payment: null, response: await read(prepared.response) };
 
   const session = await openSession();
   const response = await prepared.payment
     .pay({ account: toWalletAccount(session, requireWallet(session)) })
     .catch(rethrowPayment(`pay ${payment.realm}`));
 
-  return { endpoint: request.url, payment, response: await read(response) };
+  return { endpoint: url, payment, response: await read(response) };
 }
 
-/** The Challenge's own terms, resolved for display and for the amount guard. */
-async function describeChallenge(challenge: Challenge.Challenge) {
+/**
+ * Reads the prices an endpoint's `402` Challenge offers — one per currency it
+ * accepts — and pays nothing. No wallet is opened; the Privy session only
+ * starts once a payment is actually signed.
+ */
+export async function quoteEndpoint(endpoint: string, opts: RequestOptions) {
+  const { url, payment } = await prepare(endpoint, opts);
+  return { endpoint: url, quotes: payment?.quotes ?? [] };
+}
+
+/**
+ * Issues the request once — a Challenge only comes back when the endpoint is
+ * actually called — and resolves its terms, if the endpoint raises one.
+ * When `token` names a currency, the matching Challenge is selected for pay.
+ */
+async function prepare(endpoint: string, opts: RequestOptions & { token?: Address }) {
+  const request = await toRequest(endpoint, opts);
+  const token = opts.token?.toLowerCase();
+
+  // polyfill: false keeps globalThis.fetch untouched, so every other request in
+  // the process stays on the stock fetch.
+  const mppx = Mppx.create({
+    methods: [tempo.charge({ expectedChainId: TEMPO_CHAIN_ID })],
+    polyfill: false,
+  });
+
+  const prepared = await mppx
+    .prepareRequest(request.url, request.init, {
+      // A 402 can offer one Challenge per currency. Sort the named token's
+      // Challenge first so `pay` signs that one; never empty the list here, so
+      // a token the endpoint does not accept fails with our error naming the
+      // quotes instead of an SDK selection error.
+      ...(token && {
+        orderChallenges: (candidates) =>
+          candidates.toSorted(
+            (a, b) =>
+              Number(challengeCurrency(b.challenge) === token) -
+              Number(challengeCurrency(a.challenge) === token),
+          ),
+      }),
+    })
+    .catch(rethrowPayment(`prepare a request to ${endpoint}`));
+
+  const payment = prepared.payment ? await describePayment(prepared.payment, opts.token) : null;
+  return { url: request.url, payment, prepared };
+}
+
+/** The currency a Challenge asks to be paid in, lowercased for comparison. */
+function challengeCurrency(challenge: Challenge.Challenge) {
+  const currency = (challenge.request as { currency?: unknown }).currency;
+  return typeof currency === "string" ? currency.toLowerCase() : "";
+}
+
+/** One Challenge's own terms: who asks, and for how much in which currency. */
+type ChallengeTerms = {
+  id: string;
+  realm: string;
+  method: string;
+  description: string | null;
+  recipient: string | null;
+  expires: string | null;
+  quote: Quote;
+};
+
+/** The selected terms alongside every price the endpoint offered. */
+export type Payment = ChallengeTerms & { quotes: Quote[] };
+
+/**
+ * Resolves one Challenge's terms, or null when its request is not a
+ * `tempo/charge` — a mixed offer must not sink the currencies that parse.
+ */
+async function describeChallenge(challenge: Challenge.Challenge): Promise<ChallengeTerms | null> {
   const charge = chargeRequestSchema.safeParse(challenge.request);
-  if (!charge.success)
-    throw new CliError(
-      "MPP_CHALLENGE_INVALID",
-      `The ${challenge.method}/${challenge.intent} Challenge from ${challenge.realm} names no amount and currency.`,
-    );
+  if (!charge.success) return null;
 
   // The chain is the authority on decimals and symbol; the Challenge's own
   // decimals are the fallback for a currency that is not a Tempo TIP-20.
   const currency = charge.data.currency as Address;
   const metadata = await readTokenMetadata(currency);
   const decimals = metadata?.decimals ?? charge.data.decimals;
-  if (decimals === undefined)
-    throw new CliError(
-      "MPP_CHALLENGE_INVALID",
-      `Could not read the decimals of ${currency}, the currency ${challenge.realm} asks to be paid in.`,
-    );
+  if (decimals === undefined) return null;
 
   return {
     id: challenge.id,
     realm: challenge.realm,
     method: `${challenge.method}/${challenge.intent}`,
     description: challenge.description ?? charge.data.description ?? null,
-    amount: charge.data.amount,
-    formatted: formatAmount(BigInt(charge.data.amount), decimals, metadata?.symbol ?? null),
-    decimals,
-    currency,
-    symbol: metadata?.symbol ?? null,
     recipient: charge.data.recipient ?? null,
     expires: challenge.expires ?? null,
+    quote: {
+      amount: charge.data.amount,
+      currency,
+      symbol: metadata?.symbol ?? null,
+      formatted: formatAmount(BigInt(charge.data.amount), decimals, metadata?.symbol ?? null),
+    },
   };
+}
+
+/**
+ * Resolves every Challenge the endpoint offered into quotes and picks the one
+ * `fetch` would settle: the `--token` currency when given, else the client's
+ * own selection.
+ */
+async function describePayment(
+  payment: { challenge: Challenge.Challenge; challenges: readonly Challenge.Challenge[] },
+  token: Address | undefined,
+): Promise<Payment> {
+  const offered = (
+    await Promise.all(
+      payment.challenges.map(async (challenge) => ({
+        challenge,
+        terms: await describeChallenge(challenge),
+      })),
+    )
+  ).filter((entry) => entry.terms !== null);
+
+  if (offered.length === 0)
+    throw new CliError(
+      "MPP_CHALLENGE_INVALID",
+      `The ${payment.challenge.method}/${payment.challenge.intent} Challenge from ${payment.challenge.realm} names no amount and currency.`,
+    );
+
+  const quotes = offered.map((entry) => entry.terms!.quote);
+  const match = token
+    ? offered.find((entry) => entry.terms!.quote.currency.toLowerCase() === token.toLowerCase())
+    : undefined;
+  if (token && !match)
+    throw new CliError(
+      "MPP_TOKEN_NOT_ACCEPTED",
+      `${payment.challenge.realm} does not quote a price in ${token}.`,
+      `It accepts ${quotes.map((quote) => quote.formatted).join(" or ")} — run \`alln mpp quote\` to list them.`,
+    );
+
+  // Without --token the client's own selection stands; with it, the ordering in
+  // prepare() already made the match the selected Challenge.
+  const terms =
+    match?.terms ??
+    offered.find((entry) => entry.challenge === payment.challenge)?.terms ??
+    (await describeChallenge(payment.challenge));
+  if (!terms)
+    throw new CliError(
+      "MPP_CHALLENGE_INVALID",
+      `The ${payment.challenge.method}/${payment.challenge.intent} Challenge from ${payment.challenge.realm} names no amount and currency.`,
+    );
+
+  return { ...terms, quotes };
 }
 
 /**
@@ -109,21 +209,6 @@ async function describeChallenge(challenge: Challenge.Challenge) {
  */
 function formatAmount(amount: bigint, decimals: number, symbol: string | null) {
   return `${formatUnits(amount, decimals)}${symbol ? ` ${symbol}` : ""}`;
-}
-
-type Payment = Awaited<ReturnType<typeof describeChallenge>>;
-
-export function assertWithinMaxAmount(payment: Payment, maxAmount: string | undefined) {
-  if (maxAmount === undefined) return;
-
-  const limit = parseTokenAmount(maxAmount, false, payment.decimals, "MPP_AMOUNT_EXCEEDED");
-  if (BigInt(payment.amount) <= limit) return;
-
-  throw new CliError(
-    "MPP_AMOUNT_EXCEEDED",
-    `${payment.realm} asks for ${payment.formatted}, more than the ${formatAmount(limit, payment.decimals, payment.symbol)} --max-amount allows.`,
-    "Raise --max-amount to pay it, or pass --inspect to read the terms without paying.",
-  );
 }
 
 // Tempo charges name the amount in base units alongside the TIP-20 they settle
@@ -192,7 +277,7 @@ function toUrl(endpoint: string, query: string[]) {
     throw new CliError(
       "MPP_REQUEST_INVALID",
       `${endpoint} is not an http(s) URL.`,
-      "Pass the whole endpoint, e.g. https://api.example.com/v1/search — `alln mpp discover` prints them ready to use.",
+      "Pass the whole endpoint, e.g. https://mpp.orthogonal.com/olostep/v1/scrapes — `alln mpp discover` prints them ready to use.",
     );
 
   for (const entry of query) {

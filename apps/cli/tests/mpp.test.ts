@@ -1,31 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { assertWithinMaxAmount, toRequest } from "../src/lib/mpp.ts";
-import { CliError } from "../src/utils/errors.ts";
-
-// The shape describeChallenge returns; only the fields the amount guard reads
-// are ever populated.
-const challenge = {
-  amount: "50000", // 0.05 at 6 decimals
-  formatted: "0.05 USDC",
-  decimals: 6,
-  symbol: "USDC",
-} as Parameters<typeof assertWithinMaxAmount>[0];
-
-test("--max-amount admits a challenge at or under the ceiling", () => {
-  expect(() => assertWithinMaxAmount(challenge, "0.05")).not.toThrow();
-  expect(() => assertWithinMaxAmount(challenge, "1")).not.toThrow();
-  expect(() => assertWithinMaxAmount(challenge, undefined)).not.toThrow();
-});
-
-test("--max-amount refuses a challenge over the ceiling", () => {
-  try {
-    assertWithinMaxAmount(challenge, "0.049999");
-    expect.unreachable();
-  } catch (error) {
-    expect(error).toBeInstanceOf(CliError);
-    expect((error as CliError).code).toBe("MPP_AMOUNT_EXCEEDED");
-  }
-});
+import { toRequest } from "../src/lib/mpp.ts";
 
 test("repeated --query flags append in order", async () => {
   const request = await toRequest("https://api.example.com/v1/search", {

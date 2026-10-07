@@ -114,17 +114,19 @@ Tempo has no native gas token, so fees come out of a USD-denominated TIP-20. Eve
 
 `alln mpp` finds and calls APIs that charge per request over [MPP](https://mpp.dev), settling a `402` Challenge from the active wallet. No account and no API key.
 
-| Command                     | Description                                  |
-| --------------------------- | -------------------------------------------- |
-| `alln mpp discover <query>` | Search the MPP catalog for payable endpoints |
-| `alln mpp fetch <endpoint>` | Call an endpoint, paying its `402` Challenge |
+| Command                     | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| `alln mpp discover <query>` | Search payable endpoints, described in natural language |
+| `alln mpp fetch <endpoint>` | Call an endpoint, paying its `402` Challenge            |
+| `alln mpp quote <endpoint>` | Print the price an endpoint charges, without paying     |
 
 ### Options
 
-- `discover`: `--limit/-l <n>` (default 20, max 1000), `--skip <n>`, `--refresh` to re-download the catalog instead of reading the cache.
-- `fetch`: `--method/-X <method>` (defaults to `GET`, or `POST` with a body), `--header/-H "Name: value"`, `--query/-q key=value`, `--data/-d <body or @path>`, `--form/-F key=value or key=@path`, `--inspect` to report the price without paying, `--max-amount <amount>` to refuse a Challenge above that price.
+- `discover`: `--limit/-l <n>` (default 20, max 50).
+- `fetch` and `quote`: `--method/-X <method>` (defaults to `GET`, or `POST` with a body), `--header/-H "Name: value"`, `--query/-q key=value`, `--data/-d <body or @path>`, `--form/-F key=value or key=@path`.
+- `fetch` also takes `--token/-t <address>` to pick which offered currency to pay in; `quote` prints every offered price, one per line.
 - `--data` and `--form` cannot both carry the body, and either implies `POST`. Repeated `--header`, `--query`, and `--form` collect every value.
-- `--inspect` reads the Challenge, so it needs no wallet. `fetch` writes the response body to stdout and the payment notice to stderr; with `--json` both are one document.
+- `quote` sends the same request `fetch` would — a Challenge only comes back when the endpoint is actually called — then stops at the `402`, so it needs no wallet. `fetch` writes the response body to stdout and the payment notice to stderr; with `--json` both are one document.
 
 ## storage
 
