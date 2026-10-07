@@ -8,7 +8,7 @@ import { SuggestionsList } from "../components/suggestions-list";
 
 export const Route = createFileRoute("/chat")({
   head: () => ({
-    meta: [{ title: "Allegretto Network - Agent Commerce Protocol" }],
+    meta: [{ title: "Allegretto - Agent Commerce Protocol" }],
   }),
   component: Chat,
 });

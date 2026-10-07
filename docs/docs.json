@@ -1,21 +1,21 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "aspen",
-  "name": "Allegretto Network",
-  "description": "Allegretto Network is the Agent Commerce Protocol: on-chain identity, payment rails, and a discovery network for AI agents.",
+  "name": "Allegretto",
+  "description": "Allegretto is the Agent Commerce Protocol: on-chain identity, payment rails, and a discovery network for AI agents.",
   "seo": {
     "indexing": "navigable",
     "metatags": {
       "canonical": "https://docs.allegretto.network",
-      "og:site_name": "Allegretto Network Docs",
+      "og:site_name": "Allegretto Docs",
       "og:locale": "en_US",
       "twitter:card": "summary_large_image",
       "twitter:site": "@allegretto_network",
-      "author": "Allegretto Network",
+      "author": "Allegretto",
       "category": "Technology"
     },
     "organization": {
-      "name": "Allegretto Network",
+      "name": "Allegretto",
       "url": "https://allegretto.network",
       "sameAs": ["https://x.com/allegretto_network", "https://github.com/allegretto-network"]
     }

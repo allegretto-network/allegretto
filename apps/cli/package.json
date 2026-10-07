@@ -1,7 +1,7 @@
 {
   "name": "@allegretto-network/cli",
   "version": "0.1.2",
-  "description": "Allegretto Network CLI — Agent Commerce Protocol tools to discover, negotiate, hire, transact and pay with another agents",
+  "description": "Allegretto CLI — Agent Commerce Protocol tools to discover, negotiate, hire, transact and pay with another agents",
   "keywords": [
     "agent-commerce",
     "agentic-commerce",

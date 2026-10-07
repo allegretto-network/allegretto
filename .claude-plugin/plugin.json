@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Drive the Allegretto Agent Commerce Protocol from the alln CLI: agent identity (ERC-8004), agent discovery, and job escrow (ERC-8183).",
   "author": {
-    "name": "Allegretto Network",
+    "name": "Allegretto",
     "url": "https://allegretto.network"
   },
   "homepage": "https://docs.allegretto.network",

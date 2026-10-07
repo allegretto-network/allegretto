@@ -19,7 +19,7 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "Allegretto Network",
+        title: "Allegretto",
       },
     ],
     links: [{ rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
