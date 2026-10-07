@@ -23,8 +23,8 @@ export function getCached<T>(id: string, key: string): T | undefined {
   return cacheFor(id).getKey<T>(key);
 }
 
-export function setCached<T>(id: string, key: string, value: T): void {
+export function setCached<T>(id: string, key: string, value: T, ttl?: string | number): void {
   const cache = cacheFor(id);
-  cache.setKey(key, value);
+  cache.setKey(key, value, ttl);
   cache.save();
 }
