@@ -113,7 +113,7 @@ function formatAmount(amount: bigint, decimals: number, symbol: string | null) {
 
 type Payment = Awaited<ReturnType<typeof describeChallenge>>;
 
-function assertWithinMaxAmount(payment: Payment, maxAmount: string | undefined) {
+export function assertWithinMaxAmount(payment: Payment, maxAmount: string | undefined) {
   if (maxAmount === undefined) return;
 
   const limit = parseTokenAmount(maxAmount, false, payment.decimals, "MPP_AMOUNT_EXCEEDED");
@@ -151,7 +151,7 @@ async function read(response: Response) {
  * Turns curl-style repeated flags into one request. `--data` and `--form` are
  * mutually exclusive bodies, and either one implies POST the way curl does.
  */
-async function toRequest(endpoint: string, opts: RequestOptions) {
+export async function toRequest(endpoint: string, opts: RequestOptions) {
   if (opts.data !== undefined && (opts.form ?? []).length > 0)
     throw new CliError(
       "FLAG_CONFLICT",
@@ -204,8 +204,8 @@ function toUrl(endpoint: string, query: string[]) {
 }
 
 function toHeaders(entries: string[]) {
-  // Headers' own array initializer appends, so a header passed twice is sent
-  // twice rather than overwritten.
+  // Headers' array initializer follows HTTP combining: a header passed twice
+  // is sent once with comma-joined values, e.g. `X-A: 1` + `X-A: 2` -> `1, 2`.
   return new Headers(entries.map((entry) => splitPair(entry, ":", '--header "Name: value"')));
 }
 

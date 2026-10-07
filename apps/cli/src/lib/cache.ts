@@ -3,8 +3,8 @@ import path from "node:path";
 import { create } from "flat-cache";
 
 // ~/.allegretto/alln/cache/<id>.json persists key/value pairs across CLI invocations.
-// Callers pick their own cache id and key format; entries never expire
-// unless the caller overwrites or clears them itself.
+// Callers pick their own cache id and key format; an entry expires after the
+// ttl its setCached passed, or when the caller overwrites or clears it.
 const caches = new Map<string, ReturnType<typeof create>>();
 
 function cacheFor(id: string) {

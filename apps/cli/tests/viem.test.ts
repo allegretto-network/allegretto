@@ -49,13 +49,24 @@ async function signLike(transaction: Record<string, unknown>) {
   };
 }
 
-test("signs the digest of the exact envelope viem serialized", async () => {
-  const transaction: Record<string, unknown> = { ...prepared, feeToken: usdc };
-  const { digest } = await signLike(transaction);
+// The sender signs the envelope with the fee-payer slot empty: their digest
+// excludes the fee payer's signature, so the fee payer signs the very same
+// payload afterwards.
+test("signs the envelope excluding the fee payer's signature", async () => {
+  const feePayerKey = keccak256("0xf33d");
+  const feePayerSignature = parseSignature(
+    await privateKeyToAccount(feePayerKey).sign({ hash: keccak256("0xbeef") }),
+  );
+  const sponsored = { ...prepared, feePayer: true, from: recipient, feePayerSignature };
+  const { digest } = await signLike(sponsored);
 
-  // The sender commits to the envelope viem built, so the digest must be the
-  // hash of that serialization rather than of any re-encoding of the fields.
-  expect(digest).toBe(keccak256(await serialize(transaction as unknown as Serializable)));
+  // The sender's digest is the envelope with the fee-payer slot empty. The
+  // final broadcast envelope — both signatures, sender committed to nothing
+  // about the fee payer's — is a different serialization of the same fields.
+  const senderSignature = parseSignature(await privateKeyToAccount(key).sign({ hash: digest }));
+  expect(digest).not.toBe(
+    keccak256(await serialize(sponsored as unknown as Serializable, senderSignature)),
+  );
 });
 
 test("recovers the wallet address from the signed digest", async () => {
