@@ -28,6 +28,11 @@ export type ErrorCode =
   | "JOB_ACTION_FAILED"
   | "AMOUNT_INVALID"
   | "FEE_TOKEN_INVALID"
+  | "MPP_CATALOG_FAILED"
+  | "MPP_REQUEST_INVALID"
+  | "MPP_CHALLENGE_INVALID"
+  | "MPP_AMOUNT_EXCEEDED"
+  | "MPP_PAYMENT_FAILED"
   | "API_REQUEST_FAILED";
 
 export class CliError extends Error {

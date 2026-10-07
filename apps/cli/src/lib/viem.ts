@@ -1,21 +1,9 @@
 import type { Wallet } from "@allegretto-network/core";
-import {
-  type Address,
-  type Hex,
-  type LocalAccount,
-  numberToHex,
-  type Transport,
-  zeroAddress,
-} from "viem";
+import { type Address, type Hex, keccak256, type LocalAccount, parseSignature } from "viem";
+import type { Transport } from "viem";
 import { toAccount } from "viem/accounts";
-import { Chain, type Client, createClient, TokenId, type Transaction } from "viem/tempo";
-import { CliError } from "../utils/errors.ts";
-import {
-  walletRpc,
-  type WalletSession,
-  walletSignatureSchema,
-  walletSignedTransactionSchema,
-} from "./privy.ts";
+import { Chain, type Client, createClient } from "viem/tempo";
+import { walletRpc, type WalletSession, walletSignatureSchema } from "./privy.ts";
 import { requireWallet } from "./session.ts";
 
 // The Tempo client's inferred type is too large for TypeScript to serialize, so
@@ -43,10 +31,9 @@ export function walletClient(
 }
 
 // Exposing the wallet as a viem account means viem owns transaction preparation
-// (nonce, gas, fee estimation) and broadcasting against Tempo's own RPC, which
-// keeps `sendTransactionSync` and custom-error decoding working; Privy only
-// signs. Writes pass `type: "tempo"` so Privy signs a Tempo envelope (TIP-76,
-// type 118) rather than a plain EIP-1559 transaction.
+// (nonce, gas, fee estimation), serialization, and broadcasting against Tempo's
+// own RPC, which keeps `sendTransactionSync` and custom-error decoding working;
+// Privy only produces signatures.
 export function toWalletAccount(session: WalletSession, wallet: Wallet) {
   const sign = async (body: object) =>
     walletSignatureSchema.parse(await walletRpc(session, wallet.id, body)).data.signature as Hex;
@@ -76,104 +63,44 @@ export function toWalletAccount(session: WalletSession, wallet: Wallet) {
       });
     },
 
-    async signTransaction(transaction) {
-      const response = await walletRpc(session, wallet.id, {
-        method: "eth_signTransaction",
-        params: {
-          transaction: toPrivyTransaction(transaction as Transaction.TransactionSerializable),
-        },
-      });
+    /**
+     * Signs the hash of the serialized transaction and hands the signature back
+     * to viem's serializer, rather than asking Privy to serialize.
+     *
+     * Privy's `eth_signTransaction` re-encodes the transaction from its own
+     * snake_case schema, which has no field for Tempo's fee-payer marker. A
+     * sponsored charge (`feePayer: true`) must be serialized with the `0x78`
+     * magic prefix and a `0x00` sender placeholder (TIP-76); Privy always
+     * emitted a plain `0x76` envelope instead, so a sponsored payment produced
+     * a signature over the wrong payload and the service rejected it as
+     * unverifiable. Signing the digest keeps envelope construction in viem,
+     * which does know about sponsorship.
+     */
+    async signTransaction(transaction, options) {
+      // Tempo's chain supplies the type-118 serializer; it is the same function
+      // viem's own Tempo accounts sign through.
+      const serialize = (options?.serializer ??
+        Chain.tempo.serializers.transaction) as typeof Chain.tempo.serializers.transaction;
+      // viem types the transaction as a union spanning every chain's shape,
+      // so pin it to the Tempo serializer's own parameter type.
+      const tempoTransaction = transaction as Parameters<typeof serialize>[0];
 
-      return walletSignedTransactionSchema.parse(response).data.signed_transaction as Hex;
+      // viem's serializer hashes the unsigned payload — signature slots are
+      // excluded — so a pre-filled fee-payer signature never changes what the
+      // sender signs: sender and fee payer countersign the same digest.
+      const payload = await serialize(tempoTransaction);
+
+      return serialize(
+        tempoTransaction,
+        parseSignature(
+          walletSignatureSchema.parse(
+            await walletRpc(session, wallet.id, {
+              method: "secp256k1_sign",
+              params: { hash: keccak256(payload) },
+            }),
+          ).data.signature as Hex,
+        ),
+      );
     },
   });
-}
-
-// Tempo's own type, per TIP-76. Privy's schema takes it as a number.
-const TEMPO_TRANSACTION_TYPE = 118;
-
-// Privy's transaction schema has no type-3 (blob) equivalent.
-const transactionTypes = {
-  legacy: 0,
-  eip2930: 1,
-  eip1559: 2,
-  eip4844: undefined,
-  eip7702: 4,
-  tempo: TEMPO_TRANSACTION_TYPE,
-} as const;
-
-// Privy's transaction schema is snake_case and rejects unknown keys, so viem's
-// camelCase fields are mapped across explicitly.
-export function toPrivyTransaction(transaction: Transaction.TransactionSerializable) {
-  // Privy's schema carries neither access_list nor authorization_list, so these
-  // would be silently dropped and a different transaction signed than the one
-  // that was prepared. Checked by field rather than by type because every
-  // non-legacy type can carry an access list.
-  if (transaction.accessList?.length)
-    throw new CliError(
-      "WALLET_RPC_FAILED",
-      "Access lists are not supported by the Privy wallet adapter.",
-      "Send this transaction without an access list.",
-    );
-  if (transaction.authorizationList?.length)
-    throw new CliError(
-      "WALLET_RPC_FAILED",
-      "eip7702 authorization lists are not supported by the Privy wallet adapter.",
-      "Send this transaction without an authorization list.",
-    );
-
-  const quantity = (value: bigint | number | undefined) =>
-    value === undefined ? undefined : numberToHex(value);
-
-  const shared = {
-    chain_id: transaction.chainId,
-    nonce: transaction.nonce,
-    gas_limit: quantity(transaction.gas),
-    max_fee_per_gas: quantity(transaction.maxFeePerGas),
-    max_priority_fee_per_gas: quantity(transaction.maxPriorityFeePerGas),
-  };
-
-  if (transaction.type === "tempo")
-    return {
-      ...shared,
-      type: TEMPO_TRANSACTION_TYPE,
-      // A Tempo transaction carries a list of calls instead of one
-      // to/data/value triple. The list is derived the way viem's own Tempo
-      // serializer derives it — an empty list counts as absent — so Privy
-      // signs the transaction viem prepared and estimated gas for.
-      calls: (transaction.calls?.length ? transaction.calls : [toCall(transaction)]).map(
-        (call) => ({
-          to: call.to,
-          data: call.data ?? "0x",
-          value: quantity(call.value),
-        }),
-      ),
-      // Tempo has no native gas token: fees come out of a TIP-20, chosen here
-      // or by Tempo's fee-token preference rules when left unset.
-      fee_token:
-        transaction.feeToken === undefined ? undefined : TokenId.toAddress(transaction.feeToken),
-      nonce_key: quantity(transaction.nonceKey),
-      valid_before: transaction.validBefore,
-      valid_after: transaction.validAfter,
-    };
-
-  return {
-    ...shared,
-    to: transaction.to ?? undefined,
-    data: transaction.data,
-    value: quantity(transaction.value),
-    type: transaction.type ? transactionTypes[transaction.type] : undefined,
-    gas_price: quantity(transaction.gasPrice),
-  };
-}
-
-// viem only fills `calls` when the caller passes them, and sends a plain
-// to/data/value request otherwise; its serializer substitutes the zero address
-// for a value transfer with no recipient.
-function toCall(transaction: Transaction.TransactionSerializable) {
-  return {
-    to: transaction.to ?? (transaction.data && transaction.data !== "0x" ? undefined : zeroAddress),
-    data: transaction.data,
-    value: transaction.value,
-  };
 }

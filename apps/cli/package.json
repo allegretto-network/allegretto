@@ -53,6 +53,7 @@
     "cross-keychain": "catalog:",
     "flat-cache": "catalog:",
     "hono": "catalog:",
+    "mppx": "catalog:",
     "picocolors": "catalog:",
     "uqr": "catalog:",
     "uuid": "catalog:",

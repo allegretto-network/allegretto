@@ -43,13 +43,14 @@ catalog:
   typescript: ^7.0.2
   uqr: ^0.1.3
   uuid: ^14.0.2
-  viem: ^2.56.3
+  viem: ^2.57.1
   vite: npm:@voidzero-dev/vite-plus-core@0.3.0
   vite-plugin-svgr: ^5.2.0
   vite-plus: 0.3.0
   wrangler: ^4.129.0
   zod: ^4.6.5
   zod-commander: ^0.2.0
+  mppx: ^0.13.1
 overrides:
   vite@*: "catalog:"
 peerDependencyRules:

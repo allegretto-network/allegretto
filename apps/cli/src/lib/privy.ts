@@ -206,9 +206,6 @@ export type WalletSession = Awaited<ReturnType<typeof openWalletSession>>;
 // Privy's RPC responses wrap the result in `data`; callers pick the field their
 // method returns.
 export const walletSignatureSchema = z.object({ data: z.object({ signature: z.string() }) });
-export const walletSignedTransactionSchema = z.object({
-  data: z.object({ signed_transaction: z.string() }),
-});
 
 export async function walletRpc(session: WalletSession, walletId: string, body: object) {
   const url = `${PRIVY_AUTH_ORIGIN}${PRIVY_OAUTH_PATH}/wallets/${walletId}/rpc`;
