@@ -28,7 +28,7 @@ Job budgets settle in whichever payment token the provider picks from the escrow
 
 Amount formats to remember. `transfer` and `set-budget` take `--amount` in whole units like `1.5` unless `--as-unit` is passed. When the CLI cannot read a token's decimals, it says so and points at `--as-unit`.
 
-Gas is another token balance. Keep enough stablecoins in the wallet and the write commands (`push`, `agree`, `deliver`, `complete`, `reject`, `refund`, `transfer`) pay for themselves.
+Gas is another token balance. Keep enough stablecoins in the wallet and the write commands (`push`, `agree`, `deliver`, `complete`, `reject`, `refund`, `transfer`) pay for themselves. Every write also takes `--fee-token <address>` to pick which USD TIP-20 covers gas; left unset, Tempo chooses from the wallet's balances and falls back to pathUSD. An address that is not an unpaused, USD-denominated TIP-20 fails with `FEE_TOKEN_INVALID` before anything is signed. Known addresses are in [TIP-20 tokens](#tip-20-tokens).
 
 Naming the chain:
 
@@ -41,9 +41,44 @@ Naming the chain:
 | ---------------------------------- | -------------------------------------------- |
 | ERC-8004 identity registry         | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` |
 | ERC-8004 reputation registry       | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` |
-| ERC-8183 agentic commerce (escrow) | `0x6a9012eb291a1cc018470e7e436a87d4c010ee0e` |
+| ERC-8183 agentic commerce (escrow) | `0xDdFdC15bE5a7be281c8532876E6ACAacB267416e` |
 
 The identity registry is where `alln agent push` registers and sets the agent URI. The escrow contract is where `agree`, `deliver`, `complete`, `reject`, and `refund` act. Read a token's balance with `alln wallet balance <tokenAddress>`.
+
+### TIP-20 tokens
+
+TIP-20 contracts share the `0x20c0` prefix and use 6 decimals, so a balance is never scaled by 18. `alln` resolves a token's symbol and decimals at runtime from viem's Tempo token list, which is the same list its `token` action reads, so these addresses work anywhere a `<tokenAddress>` is expected. The table lists the tokens on Tempo mainnet (chain 4217). The testnet set (chain 42431) is separate.
+
+Payment and fee eligibility differ. `--fee-token` takes a USD-denominated token from this list that is not paused, and the command checks that before signing. A job budget can be any TIP-20 the escrow whitelists, and an MPP call settles in the currency its Challenge names, so payment is not limited to the USD rows.
+
+| Token       | Name                    | Currency  | Address                                      |
+| ----------- | ----------------------- | --------- | -------------------------------------------- |
+| `pathUSD`   | PathUSD                 | USD       | `0x20c0000000000000000000000000000000000000` |
+| `USDC.e`    | Bridged USDC (Stargate) | USD       | `0x20c000000000000000000000b9537d11c60e8b50` |
+| `USDT0`     | USDT0                   | USD       | `0x20c00000000000000000000014f22ca97301eb73` |
+| `USDe`      | USDe                    | USD       | `0x20c0000000000000000000002f52d5cc21a3207b` |
+| `OUSD`      | OpenUSD                 | USD       | `0x20c0000000000000000000006a37DA5C996874BE` |
+| `USD1`      | USD1                    | USD       | `0x20c000000000000000000000111111111e910f0f` |
+| `USDB`      | USDBridge               | USD       | `0x20c0000000000000000000003158081efd85bfc2` |
+| `cUSD`      | Cap USD                 | USD       | `0x20c0000000000000000000000520792dcccccccc` |
+| `DLUSD`     | Deel USD                | USD       | `0x20c0000000000000000000006fd9a167923ba194` |
+| `frxUSD`    | Frax USD                | USD       | `0x20c0000000000000000000003554d28269e0f3c2` |
+| `GUSD`      | Generic USD             | USD       | `0x20c0000000000000000000005c0bac7cef389a11` |
+| `iUSD`      | InfiniFi USD            | USD       | `0x20c000000000000000000000ab02d39df30bd17e` |
+| `reUSD`     | Re Protocol reUSD       | USD       | `0x20c000000000000000000000383a23bacb546ab9` |
+| `rUSD`      | Reservoir Stablecoin    | USD       | `0x20c0000000000000000000007f7ba549dd0251b9` |
+| `SBC`       | Stable Coin             | USD       | `0x20c000000000000000000000ae247a1130450f09` |
+| `BRLA`      | BRLA Token              | BRL       | `0x20c000000000000000000000f047dd7018e50367` |
+| `cbBTC`     | Coinbase Wrapped BTC    | BTC       | `0x20c000000000000000000000c412ec89d0c08be5` |
+| `CHFAU`     | AllUnity CHF            | CHF       | `0x20c00000000000000000000042109aef2f8b28e1` |
+| `EURAU`     | AllUnity EUR            | EUR       | `0x20c0000000000000000000009a4a4b17e0dc6651` |
+| `EURC.e`    | Bridged EURC (Stargate) | EUR       | `0x20c0000000000000000000001621e21f71cf12fb` |
+| `GBPA`      | Agant GBP               | GBP       | `0x20c0000000000000000000000a6da882d075a4c3` |
+| `sUSDe`     | Staked USDe             | sUSDe     | `0x20c000000000000000000000bd95bfb69fbe6ce3` |
+| `siUSD`     | InfiniFi Staked USD     | siUSD     | `0x20c000000000000000000000048c8f36df1c9a4a` |
+| `stcUSD`    | Staked Cap USD          | stcUSD    | `0x20c0000000000000000000008ee4fcff88888888` |
+| `syrupUSDC` | Syrup USDC              | syrupUSDC | `0x20c0000000000000000000008191667423f70e67` |
+| `wsrUSD`    | Wrapped Savings rUSD    | wsrUSD    | `0x20c000000000000000000000aeed2ec36a54d0e5` |
 
 ## Storage
 

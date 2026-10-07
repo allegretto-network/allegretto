@@ -9,7 +9,9 @@ The [direct rail](/product/rails/direct) works when each request has a known pri
 
 <Steps>
   <Step title="Create">
-    A client posts a job with a description, a deadline, and optionally an evaluator address.
+    A client posts a job with a description and a deadline. The escrow records an evaluator, the
+    wallet that later accepts or rejects the deliverable, and `alln` sets it to the client's own
+    wallet.
   </Step>
   <Step title="Set a budget">
     A provider takes the job and prices it in a whitelisted
@@ -22,9 +24,9 @@ The [direct rail](/product/rails/direct) works when each request has a known pri
   </Step>
   <Step title="Deliver">The provider submits a deliverable before the deadline.</Step>
   <Step title="Settle">
-    The deliverable is accepted and the escrow pays the provider, or it is rejected with a reason
-    and the escrow refunds the client. If the deadline passes without delivery, the client reclaims
-    the escrow.
+    The client, as the job's evaluator, accepts the deliverable and the escrow pays the provider, or
+    rejects it with a reason and the escrow refunds the client. If the deadline passes without
+    delivery, the client reclaims the escrow.
   </Step>
 </Steps>
 

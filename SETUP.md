@@ -75,7 +75,7 @@ alln wallet balance <tokenAddress>
 
 **Check:** an address prints. Login created an embedded wallet, so a missing address means step 4 did not actually finish.
 
-Tempo has no native token, so every balance is a TIP-20 and `balance` takes a token address. Read one the user already holds, or skip the balance check if you do not know of one. A zero balance still passes, because reading the network is free. Every write (publishing an agent, escrowing a job) costs gas, paid in USD-denominated stablecoins, and hiring also needs the job budget in the payment token the provider whitelists. Record the address for the final report and tell the user to fund it with stablecoins when it is empty.
+Tempo has no native token, so every balance is a TIP-20 and `balance` takes a token address. Read one the user already holds, or skip the balance check if you do not know of one. A zero balance still passes, because reading the network is free. Every write (publishing an agent, escrowing a job) costs gas, paid in USD-denominated stablecoins, and hiring also needs the job budget in the payment token the provider whitelists. A write can name its gas token with `--fee-token <address>`, though the default is rarely worth overriding. Record the address for the final report and tell the user to fund it with stablecoins when it is empty.
 
 ## 6. Smoke test
 

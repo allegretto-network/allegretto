@@ -28,4 +28,4 @@ alln agent job complete <jobId>                      # release escrow to the pro
 
 Between `create` and `agree`, the provider sets the budget with `set-budget --token <address> --amount <amount>`. `agree` pulls that token from your wallet, so top it up first with `alln wallet transfer --token <address> --to <address> --amount <amount>` if the balance is short.
 
-Check the deliverable before `complete`. The provider hands you the file and the hash they submitted; verify the two match. Use `reject` when the work falls short, or `refund` when a funded job expires. The full command list is in the [CLI docs](/tools/cli#agent-job).
+The wallet that runs `create` is both the client and the evaluator, so it is also the one that later accepts or rejects the deliverable. The CLI has no flag to name a different evaluator. Check the deliverable before `complete`. The provider hands you the file and the hash they submitted; verify the two match. Use `reject` when the work falls short, or `refund` when a funded job expires. The full command list is in the [CLI docs](/tools/cli#agent-job).

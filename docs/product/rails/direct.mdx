@@ -32,12 +32,42 @@ A charge settles once per request. An API that meters usage, like an LLM endpoin
 
 Jobs that need the budget committed up front go through the [escrow rail](/product/rails/escrow) instead.
 
+## From the CLI
+
+`alln mpp` speaks the loop for you. `alln mpp discover` searches the MPP catalog for payable endpoints, and `alln mpp fetch` calls one, settling its `402` Challenge from the active wallet.
+
+```sh
+alln mpp discover "weather"                                  # find a payable endpoint
+alln mpp fetch https://api.example.com/weather --inspect    # read the price, pay nothing
+alln mpp fetch https://api.example.com/weather              # settle it and print the response
+```
+
+`--inspect` reports the amount, currency, recipient, and expiry without paying, and `--max-amount 0.05` refuses a Challenge above that price. The response body goes to stdout, so it pipes into `jq`. The [CLI docs](/tools/cli#mpp) cover the flags.
+
 ## Settlement
 
 Payments settle in Tempo stablecoins, which are [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/overview) tokens. The service picks which one it accepts and names it in the Challenge, so a client never has to guess. Tempo has no native token, settles with deterministic finality in roughly 500ms, and lets the service sponsor the transaction fee, so a wallet holding only the stablecoin it pays with needs nothing else.
 
-## Supported chains
+## TIP-20 tokens
 
-| Chain | Status |
-| ----- | ------ |
-| Tempo | Live   |
+Every token below is a USD-denominated Tempo TIP-20 and uses 6 decimals. The Challenge names the one a service accepts, so a client never picks in advance. Most [MPP catalog](https://mpp.dev/services) endpoints currently price in `USDC.e` or `pathUSD`.
+
+| Token     | Name                    | Address                                      |
+| --------- | ----------------------- | -------------------------------------------- |
+| `pathUSD` | PathUSD                 | `0x20c0000000000000000000000000000000000000` |
+| `USDC.e`  | Bridged USDC (Stargate) | `0x20c000000000000000000000b9537d11c60e8b50` |
+| `USDT0`   | USDT0                   | `0x20c00000000000000000000014f22ca97301eb73` |
+| `USDe`    | USDe                    | `0x20c0000000000000000000002f52d5cc21a3207b` |
+| `OUSD`    | OpenUSD                 | `0x20c0000000000000000000006a37DA5C996874BE` |
+| `USD1`    | USD1                    | `0x20c000000000000000000000111111111e910f0f` |
+| `USDB`    | USDBridge               | `0x20c0000000000000000000003158081efd85bfc2` |
+| `cUSD`    | Cap USD                 | `0x20c0000000000000000000000520792dcccccccc` |
+| `DLUSD`   | Deel USD                | `0x20c0000000000000000000006fd9a167923ba194` |
+| `frxUSD`  | Frax USD                | `0x20c0000000000000000000003554d28269e0f3c2` |
+| `GUSD`    | Generic USD             | `0x20c0000000000000000000005c0bac7cef389a11` |
+| `iUSD`    | InfiniFi USD            | `0x20c000000000000000000000ab02d39df30bd17e` |
+| `reUSD`   | Re Protocol reUSD       | `0x20c000000000000000000000383a23bacb546ab9` |
+| `rUSD`    | Reservoir Stablecoin    | `0x20c0000000000000000000007f7ba549dd0251b9` |
+| `SBC`     | Stable Coin             | `0x20c000000000000000000000ae247a1130450f09` |
+
+A service can accept any TIP-20 it wants, not only these. `alln mpp fetch --inspect` reports the exact token a Challenge asks for, so check it before paying.

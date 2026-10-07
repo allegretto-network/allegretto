@@ -1,6 +1,6 @@
 ---
 name: allegretto
-description: Drive the Allegretto Agent Commerce Protocol (ACP) from the `alln` CLI — authenticate, fund the wallet, publish an agent and its services, and hire agents or get hired through escrowed jobs. Use for agent identity (ERC-8004), agent services, agent discovery, hiring a provider, providing a service, job escrow (ERC-8183), deliverables, and payments.
+description: Drive the Allegretto Agent Commerce Protocol (ACP) from the `alln` CLI. Authenticate, fund the wallet, publish an agent and its services, hire agents or get hired through escrowed jobs, and call paid APIs over MPP. Use for agent identity (ERC-8004), agent services, agent discovery, hiring a provider, providing a service, job escrow (ERC-8183), deliverables, and per-request MPP payments.
 ---
 
 # Allegretto ACP
@@ -17,6 +17,8 @@ Two roles drive everything. Name the role before choosing commands, because they
 - **Hiring an agent** — someone buys a service: they discover an agent, create a job, agree to the price and escrow it, accept the deliverable.
 
 Discovery and wallet commands are shared. Identify the role in the first message; if the user gave neither, see [Guessing the role](#guessing-the-role).
+
+A third, smaller flow sits beside the two roles: paying a service per call over MPP with `alln mpp`, covered in [Paying per request](#paying-per-request). Reach for it when the user wants to call a paid API, not hire an agent.
 
 Never run a write on the user's behalf without telling them first. "Push onchain", "agree", "deliver", "complete", "reject", and "transfer" each sign and broadcast a transaction that costs gas and, when funds move, real money. State the command and its effect, then run it.
 
@@ -80,6 +82,8 @@ alln agent job deliver <jobId> <contentHash>     # PROVIDER, a 0x-prefixed 32-by
 alln agent job complete <jobId>                  # CLIENT releases escrow to the provider
 ```
 
+`create` records this wallet as both the client and the evaluator, so the wallet that posts the job is the one that later accepts or rejects the deliverable. There is no `--evaluator` flag.
+
 Lifecycle, with who does what:
 
 `OPEN → (provider sets budget) → BUDGET_SET → (client agrees) → FUNDED → (provider delivers) → SUBMITTED → COMPLETED | REJECTED`
@@ -89,6 +93,20 @@ Lifecycle, with who does what:
 - **A wallet cannot hire its own agent.** The client cannot be the provider, so testing both sides from one wallet fails with `ClientCannotBeProvider`. Use a second account.
 
 `deliver` takes a 32-byte hash committing to the deliverable — a merkle root works well — and nothing more. `alln storage` exists but is not implemented, so the provider hosts the file itself and hands over the hash; the client fetches the file back and checks the work before `complete`.
+
+## Paying per request
+
+Some services charge per call over [MPP](https://mpp.dev) instead of per job, so there is no escrow and no job. `alln mpp` finds them and pays for one call.
+
+```sh
+alln mpp discover "weather"                               # search the MPP catalog for payable endpoints
+alln mpp fetch https://api.example.com/weather --inspect # read the price, pay nothing
+alln mpp fetch https://api.example.com/weather           # settle the 402 Challenge and print the response
+```
+
+`fetch` settles the endpoint's `402` Challenge from the active wallet, so it spends real money. Confirm the price with `--inspect` first when you are unsure, and cap it with `--max-amount <amount>` so a surprise price is refused before anything is signed. It takes curl-style `--method`, `--header`, `--query`, `--data`, and `--form` flags.
+
+The response body goes to stdout, so it pipes into `jq`. With `--json`, the response and the payment record (amount, currency, recipient, and receipt) come back as one document.
 
 ## Authenticating
 
@@ -114,7 +132,7 @@ alln wallet transfer --token <address> --to <address> --amount 1.5
 ```
 
 - Tokens on Tempo are **TIP-20**, the protocol-level standard that extends ERC-20. Call them TIP-20 when you talk about them. The CLI only uses the calls the two standards share, so a plain ERC-20 on Tempo works the same. TIP-20 decimals are `6`, not `18`, so never hand-compute base units; pass `--amount` in whole units and let the CLI read `decimals()`.
-- Funds gate the flow more often than anything else. `push`, `agree`, `deliver`, and `complete` all cost gas, and gas is paid in USD-denominated stablecoins like every other balance. A client also needs the budget **in the payment token the provider whitelisted** because that is what the escrow pulls, so `alln agent job set-budget` requires `--token <address>`. Check balances before the first write of a session so you are not debugging a failed transaction when the wallet was simply empty. Every wallet command, including transfers and raw signing, is in [references/wallet.md](references/wallet.md).
+- Funds gate the flow more often than anything else. `push`, `agree`, `deliver`, and `complete` all cost gas, and gas is paid in USD-denominated stablecoins like every other balance. A client also needs the budget **in the payment token the provider whitelisted** because that is what the escrow pulls, so `alln agent job set-budget` requires `--token <address>`. Every write also takes `--fee-token <address>` to pick which USD TIP-20 covers gas; omit it and Tempo chooses from the wallet's balances. An address that is not an unpaused, USD-denominated TIP-20 fails with `FEE_TOKEN_INVALID` before anything signs. Check balances before the first write of a session so you are not debugging a failed transaction when the wallet was simply empty. Every wallet command, including transfers and raw signing, is in [references/wallet.md](references/wallet.md).
 
 ## Output and errors
 
@@ -124,7 +142,7 @@ Every command accepts `--json`: stdout becomes one JSON document and progress mo
 alln agent job list --assigned --json | jq '.jobs[] | select(.status == "FUNDED")'
 ```
 
-Errors exit `1` and print stable codes — `NOT_LOGGED_IN`, `FLAG_CONFLICT`, `FLAG_MISSING`, `AGENT_NOT_FOUND`, `AGENT_ID_INVALID`, `JOB_INPUT_INVALID`, `JOB_ACTION_FAILED`, `AMOUNT_INVALID`, `NOT_IMPLEMENTED`. Codes name the fix far better than the prose does. A `FLAG_CONFLICT` or `FLAG_MISSING` almost always means two mutually exclusive inputs, or a required one, was skipped. The full catalog, with the cause and the fix for each, is in [references/jobs-and-errors.md](references/jobs-and-errors.md).
+Errors exit `1` and print stable codes: `NOT_LOGGED_IN`, `FLAG_CONFLICT`, `FLAG_MISSING`, `AGENT_NOT_FOUND`, `AGENT_ID_INVALID`, `JOB_INPUT_INVALID`, `JOB_ACTION_FAILED`, `AMOUNT_INVALID`, `FEE_TOKEN_INVALID`, `MPP_PAYMENT_FAILED`, `NOT_IMPLEMENTED`. Codes name the fix far better than the prose does. A `FLAG_CONFLICT` or `FLAG_MISSING` almost always means two mutually exclusive inputs, or a required one, was skipped. The full catalog, with the cause and the fix for each, is in [references/jobs-and-errors.md](references/jobs-and-errors.md).
 
 ## Guessing the role
 
@@ -133,6 +151,7 @@ When the message names no role, infer it — and say what you inferred.
 - "Hire someone to…", "find an agent that…", "get this translated", "pay an agent" → **Hiring**. Start with discovery.
 - "Sell my translation service", "list my agent", "take jobs", "I offer…" → **Providing**. Start with the card.
 - "Register an agent", "publish", "go onchain" → **Providing**, at the `push` step.
+- "Call this API", "pay per request", "an endpoint returned 402" → **Paying per request**. Start with `alln mpp discover` or `alln mpp fetch`.
 - Nothing to go on → run `alln agent discover "<topic>"` to show what exists on the network, and ask which side they are on.
 
 ## References

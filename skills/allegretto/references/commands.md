@@ -35,7 +35,7 @@ Every `alln` command, its arguments, and its flags. `--json` is accepted at ever
 - `discover`: `--limit/-l <n>` (default 20, max 1000), `--skip <n>`.
 - `create` / `update`: `--name/-n`, `--description/-d`, `--image/-i`, or a whole card via `--data <json>` / `--file/-f <path>`. `--data`/`--file` cannot be combined with `--name`, `--description`, or `--image`; `update` merges, `create` replaces.
 - `profile` / `service list`: `--onchain` reads the numeric id as an onchain agent.
-- `push`: `--dry-run` prints the steps and the agent URI without sending transactions.
+- `push`: `--dry-run` prints the steps and the agent URI without sending transactions; `--fee-token <address>` picks the TIP-20 that pays gas.
 - `pull`: `--agent-id <id>` pulls one onchain agent; omit to pull every agent the wallet owns.
 
 ### The agent card
@@ -105,6 +105,26 @@ Tokens on Tempo are TIP-20, which extends ERC-20. The CLI uses only the shared c
 | `alln wallet send-transaction --to/-t <address>`                          | Sign and broadcast a raw transaction; `--data/-d` as hex calldata     |
 
 `transfer` takes `--token/-t <address>`, `--to <address>`, and `--amount/-a <amount>`, all required. `--to` has no short flag because `-t` is the token.
+
+### Fee tokens
+
+Tempo has no native gas token, so fees come out of a USD-denominated TIP-20. Every write command accepts `--fee-token <address>` to choose which one: `agent push`, `agent job` (create, set-budget, agree, deliver, complete, reject, refund), `agent feedback` (give, revoke, respond), `wallet transfer`, and `wallet send-transaction`. Left unset, Tempo picks from the wallet's balances and falls back to pathUSD. The address must be an unpaused, USD-denominated TIP-20; otherwise the command fails with `FEE_TOKEN_INVALID` before signing. `wallet transfer` needs no explicit fee token when the amount being sent is itself a USD TIP-20, because Tempo uses it. The Tempo TIP-20 addresses are tabulated in [wallet.md](wallet.md#tip-20-tokens).
+
+## mpp
+
+`alln mpp` finds and calls APIs that charge per request over [MPP](https://mpp.dev), settling a `402` Challenge from the active wallet. No account and no API key.
+
+| Command                     | Description                                  |
+| --------------------------- | -------------------------------------------- |
+| `alln mpp discover <query>` | Search the MPP catalog for payable endpoints |
+| `alln mpp fetch <endpoint>` | Call an endpoint, paying its `402` Challenge |
+
+### Options
+
+- `discover`: `--limit/-l <n>` (default 20, max 1000), `--skip <n>`, `--refresh` to re-download the catalog instead of reading the cache.
+- `fetch`: `--method/-X <method>` (defaults to `GET`, or `POST` with a body), `--header/-H "Name: value"`, `--query/-q key=value`, `--data/-d <body or @path>`, `--form/-F key=value or key=@path`, `--inspect` to report the price without paying, `--max-amount <amount>` to refuse a Challenge above that price.
+- `--data` and `--form` cannot both carry the body, and either implies `POST`. Repeated `--header`, `--query`, and `--form` collect every value.
+- `--inspect` reads the Challenge, so it needs no wallet. `fetch` writes the response body to stdout and the payment notice to stderr; with `--json` both are one document.
 
 ## storage
 

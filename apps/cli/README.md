@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@allegretto-network/cli.svg)](https://www.npmjs.com/package/@allegretto-network/cli)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D22.12.0-blue.svg)](https://nodejs.org)
 
-Allegretto Network CLI (`alln`) is the command-line client for the Agent Commerce Protocol: discover onchain agents, hire them through escrowed jobs, and pay them.
+Allegretto Network CLI (`alln`) is the command-line client for the Agent Commerce Protocol: discover onchain agents, hire them through escrowed jobs, pay them, and call paid APIs over MPP.
 
 All onchain operations run against Tempo with the Privy embedded wallet tied to your Allegretto account.
 
@@ -42,6 +42,8 @@ alln agent list --json | jq '.agents[].id'
 ```
 
 Errors set exit code 1. In JSON mode they print as `{ "error": { "code", "message", ... } }` with stable codes like `NOT_LOGGED_IN` or `FLAG_CONFLICT`.
+
+Set `ALLEGRETTO_API_URL` to point the CLI at another API host, such as a staging deployment. Unset, it uses the production API.
 
 ## Command reference
 
@@ -112,6 +114,19 @@ Onchain feedback follows the ERC-8004 reputation registry. `<agentId>` is the on
 | `alln agent feedback revoke <agentId> <feedbackIndex>`           | Revoke feedback this wallet gave. `<feedbackIndex>` is the per-client index shown by `list`                                                                                                                                      |
 | `alln agent feedback respond <agentId> <client> <feedbackIndex>` | Append a response to feedback, e.g. as the agent's owner. The response document comes via `--data/-d <json>` or `--file/-f <path>`                                                                                               |
 
+### mpp
+
+`alln mpp` finds and calls APIs that charge per request over [MPP](https://mpp.dev). No account or API key: the wallet that signs the payment is the customer.
+
+| Command                     | Description                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `alln mpp discover <query>` | Search the MPP catalog for payable endpoints. `--limit/-l` (default 20), `--skip` to page, `--refresh` to skip the cache |
+| `alln mpp fetch <endpoint>` | Call an endpoint, settling its `402` Challenge from the active wallet                                                    |
+
+`fetch` takes curl-style flags: `--method/-X` (defaults to `GET`, or `POST` with a body), `--header/-H "Name: value"`, `--query/-q key=value`, `--data/-d <body or @path>`, and `--form/-F key=value or key=@path`. `--data` and `--form` cannot both carry the body, and either one implies `POST`. Repeat a flag to send it more than once.
+
+A call spends real money, so two flags guard it: `--inspect` reports the Challenge and pays nothing (no wallet needed), and `--max-amount <amount>` refuses any Challenge above that price before signing. The response body goes to stdout; the payment notice goes to stderr.
+
 ### wallet
 
 Tokens on Tempo are [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/overview), the protocol-level standard that extends ERC-20. The CLI uses the shared calls (`balanceOf`, `transfer`, `approve`, `allowance`), so a plain ERC-20 contract works too.
@@ -128,6 +143,10 @@ Tokens on Tempo are [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/ov
 ### storage
 
 `storage` is registered but not implemented yet. It is reserved for a file store and currently prints a notice and exits.
+
+### Fee tokens
+
+Tempo has no native gas token, so fees come out of a USD-denominated TIP-20. Every command that writes accepts `--fee-token <address>` to choose which one: `agent push`, `agent job` (create, set-budget, agree, deliver, complete, reject, refund), `agent feedback` (give, revoke, respond), `wallet transfer`, and `wallet send-transaction`. Left unset, Tempo picks from the wallet's balances and falls back to pathUSD. A `wallet transfer` needs no explicit fee token when the amount being sent is itself a USD TIP-20, because Tempo uses it. An address that is not an unpaused, USD-denominated TIP-20 fails with `FEE_TOKEN_INVALID` before anything is signed.
 
 ## Links
 
