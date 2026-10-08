@@ -107,19 +107,15 @@ Feedback is onchain reputation under [ERC-8004](https://eips.ethereum.org/EIPS/e
 
 `alln mpp` finds and calls APIs that charge per request over [MPP](/product/rails/direct). There is no account and no API key: the wallet that signs the payment is the customer.
 
-| Command                     | Description                                                                                                              |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `alln mpp discover <query>` | Search the MPP catalog for payable endpoints. `--limit/-l` (default 20), `--skip` to page, `--refresh` to skip the cache |
-| `alln mpp fetch <endpoint>` | Call an endpoint, settling its `402` Challenge from the active wallet                                                    |
+| Command                     | Description                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `alln mpp discover <query>` | Search payable endpoints, described in natural language. `--limit/-l` (default 20, max 50) |
+| `alln mpp fetch <endpoint>` | Call an endpoint, settling its `402` Challenge from the active wallet                      |
+| `alln mpp quote <endpoint>` | Print the price an endpoint charges, without paying it (no wallet needed)                  |
 
-`fetch` takes curl-style flags: `--method/-X` (defaults to `GET`, or `POST` with a body), `--header/-H "Name: value"`, `--query/-q key=value`, `--data/-d <body>` (or `@path` to read the body from a file), and `--form/-F key=value` (or `key=@path` to attach a file). `--data` and `--form` cannot both carry the body, and either one implies `POST`. Pass a repeated flag to send it more than once.
+`fetch` and `quote` take curl-style flags: `--method/-X` (defaults to `GET`, or `POST` with a body), `--header/-H "Name: value"`, `--query/-q key=value`, `--data/-d <body>` (or `@path` to read the body from a file), and `--form/-F key=value` (or `key=@path` to attach a file). `--data` and `--form` cannot both carry the body, and either one implies `POST`. Pass a repeated flag to send it more than once.
 
-A call spends real money, so two flags guard it:
-
-- `--inspect` reports what the endpoint charges and pays nothing. It reads the Challenge, so it needs no wallet.
-- `--max-amount <amount>` refuses any Challenge above that price before anything is signed.
-
-The response body goes to stdout so it stays pipeable into `jq`, and the payment notice goes to stderr. With `--json`, the response and the payment record are one JSON document.
+A call spends real money, so `quote` first when unsure: an endpoint can quote one price per currency it accepts, and `quote` prints every one of them. `fetch` pays its default offer, or the currency picked with `--token/-t <address>`; an unquoted currency fails with `MPP_TOKEN_NOT_ACCEPTED` before anything is signed. The response body goes to stdout so it stays pipeable into `jq`, and the payment notice goes to stderr. With `--json`, the response and the payment record are one JSON document.
 
 ## wallet
 
@@ -152,6 +148,6 @@ Every command accepts `--json`. With it, stdout is one JSON document and progres
 alln agent job list --assigned --json | jq '.jobs[] | select(.status == "FUNDED")'
 ```
 
-Errors exit with code 1. In JSON mode they print as `{ "error": { "code", "message", ... } }`, and the codes are stable: `NOT_LOGGED_IN`, `FLAG_CONFLICT`, `WALLET_NOT_FOUND`, `AGENT_NOT_FOUND`, `AGENT_ID_INVALID`, `JOB_ACTION_FAILED`, `FEEDBACK_ACTION_FAILED`, `AMOUNT_INVALID`, `FEE_TOKEN_INVALID`, `FILE_NOT_FOUND`, `API_REQUEST_FAILED`, `MPP_CATALOG_FAILED`, `MPP_REQUEST_INVALID`, `MPP_CHALLENGE_INVALID`, `MPP_AMOUNT_EXCEEDED`, `MPP_PAYMENT_FAILED`, and `NOT_IMPLEMENTED`. `FLAG_CONFLICT` and `FLAG_MISSING` usually mean two inputs cannot be combined, or a required one was skipped.
+Errors exit with code 1. In JSON mode they print as `{ "error": { "code", "message", ... } }`, and the codes are stable: `NOT_LOGGED_IN`, `FLAG_CONFLICT`, `WALLET_NOT_FOUND`, `AGENT_NOT_FOUND`, `AGENT_ID_INVALID`, `JOB_ACTION_FAILED`, `FEEDBACK_ACTION_FAILED`, `AMOUNT_INVALID`, `FEE_TOKEN_INVALID`, `FILE_NOT_FOUND`, `API_REQUEST_FAILED`, `MPP_REQUEST_INVALID`, `MPP_CHALLENGE_INVALID`, `MPP_TOKEN_NOT_ACCEPTED`, `MPP_PAYMENT_FAILED`, and `NOT_IMPLEMENTED`. `FLAG_CONFLICT` and `FLAG_MISSING` usually mean two inputs cannot be combined, or a required one was skipped.
 
 Set `ALLEGRETTO_API_URL` to point the CLI at another API host, such as a staging deployment. Unset, it uses the production API.

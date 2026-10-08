@@ -34,15 +34,15 @@ Jobs that need the budget committed up front go through the [escrow rail](/produ
 
 ## From the CLI
 
-`alln mpp` speaks the loop for you. `alln mpp discover` searches the MPP catalog for payable endpoints, and `alln mpp fetch` calls one, settling its `402` Challenge from the active wallet.
+`alln mpp` speaks the loop for you. `alln mpp discover` searches for payable endpoints, `alln mpp quote` prints every price an endpoint offers without paying, and `alln mpp fetch` calls one, settling its `402` Challenge from the active wallet.
 
 ```sh
 alln mpp discover "weather"                                  # find a payable endpoint
-alln mpp fetch https://api.example.com/weather --inspect    # read the price, pay nothing
-alln mpp fetch https://api.example.com/weather              # settle it and print the response
+alln mpp quote https://api.example.com/weather               # read every price, pay nothing
+alln mpp fetch https://api.example.com/weather               # settle it and print the response
 ```
 
-`--inspect` reports the amount, currency, recipient, and expiry without paying, and `--max-amount 0.05` refuses a Challenge above that price. The response body goes to stdout, so it pipes into `jq`. The [CLI docs](/tools/cli#mpp) cover the flags.
+`quote` reports the amount, currency, recipient, and expiry of every offer, and `fetch --token <address>` picks which quoted currency to pay. The response body goes to stdout, so it pipes into `jq`. The [CLI docs](/tools/cli#mpp) cover the flags.
 
 ## Settlement
 
@@ -70,4 +70,4 @@ Every token below is a USD-denominated stablecoin on Tempo, issued as a [TIP-20]
 | `rUSD`    | Reservoir Stablecoin    | `0x20c0000000000000000000007f7ba549dd0251b9` |
 | `SBC`     | Stable Coin             | `0x20c000000000000000000000ae247a1130450f09` |
 
-A service can accept any TIP-20 it wants, not only these. `alln mpp fetch --inspect` reports the exact token a Challenge asks for, so check it before paying.
+A service can accept any TIP-20 it wants, not only these. `alln mpp quote` reports the exact tokens a Challenge asks for, so check it before paying.

@@ -1,5 +1,5 @@
-import { expect, test } from "vite-plus/test";
-import { toSearchResult } from "../src/lib/mpp/orthogonal.ts";
+import { expect, test, vi } from "vite-plus/test";
+import { searchOrthogonalTools, toSearchResult } from "../src/lib/mpp/orthogonal.ts";
 
 // The shape Orthogonal's search answers with; optional fields are omitted the
 // way the live API does for endpoints it knows less about.
@@ -65,4 +65,20 @@ test("the credit rail the search response names is never served to callers", () 
   const urls = toSearchResult(response).map((tool) => new URL(tool.url));
 
   for (const url of urls) expect(url.origin).toBe("https://mpp.orthogonal.com");
+});
+
+// Orthogonal's own limit bounds APIs, but the schema promises a bound on
+// tools, and every endpoint of an API flattens into one.
+test("the flat tool list respects the query's limit", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 200 })),
+  );
+  try {
+    const tools = await searchOrthogonalTools({ q: "enrich", limit: 1 }, "key");
+    expect(tools).toHaveLength(1);
+    expect(tools[0]?.url).toBe("https://mpp.orthogonal.com/apollo/v1/people/match");
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

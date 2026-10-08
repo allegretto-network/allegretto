@@ -79,5 +79,7 @@ export async function searchOrthogonalTools(
   if (!parsed.success)
     throw new Error("Orthogonal search returned a document this API does not understand.");
 
-  return toSearchResult(parsed.data);
+  // Orthogonal's limit bounds APIs, but the schema promises a bound on tools,
+  // and each API flattens to one tool per endpoint — cap the flat list.
+  return toSearchResult(parsed.data).slice(0, query.limit);
 }

@@ -69,8 +69,9 @@ export async function quoteEndpoint(endpoint: string, opts: RequestOptions) {
  * Issues the request once — a Challenge only comes back when the endpoint is
  * actually called — and resolves its terms, if the endpoint raises one.
  * When `token` names a currency, the matching Challenge is selected for pay.
+ * Exported for tests, which must stay clear of `pay` — it signs real money.
  */
-async function prepare(endpoint: string, opts: RequestOptions & { token?: Address }) {
+export async function prepare(endpoint: string, opts: RequestOptions & { token?: Address }) {
   const request = await toRequest(endpoint, opts);
   const token = opts.token?.toLowerCase();
 
