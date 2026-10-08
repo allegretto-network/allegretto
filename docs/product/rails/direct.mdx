@@ -42,7 +42,7 @@ alln mpp quote https://api.example.com/weather               # read every price,
 alln mpp fetch https://api.example.com/weather               # settle it and print the response
 ```
 
-`quote` reports every offered price — the amount and its currency — without paying, and `fetch --token <address>` picks which quoted currency to pay. The response body goes to stdout, so it pipes into `jq`. The [CLI docs](/tools/cli#mpp) cover the flags.
+`quote` prints every offered price — the amount and its currency — and `fetch --token <address>` picks which quoted currency to pay. The response body goes to stdout, so it pipes into `jq`. The [CLI docs](/tools/cli#mpp) cover the flags.
 
 ## Settlement
 
