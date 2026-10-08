@@ -8,11 +8,6 @@
     "enabled": true,
     "head_sampling_rate": 1,
   },
-  // Tempo subgraph endpoints are not provisioned yet; fill these in before
-  // deploy. The Graph API keys are secrets, not vars: set them with
-  // `wrangler secret put ERC_8004_SUBGRAPH_API_KEY` (and the 8183 counterpart).
-  // MPP tool discovery (`/v1/tools`) needs the Orthogonal key the same way:
-  // `wrangler secret put ORTHOGONAL_API_KEY`.
   "vars": {
     "ERC_8004_SUBGRAPH_URL": "https://gateway.thegraph.com/api/subgraphs/id/3vsqL2JzQiJYXrpE3z9xxKQEibrDSJCPFmfdr5cDf5Lm",
     "ERC_8183_SUBGRAPH_URL": "https://gateway.thegraph.com/api/subgraphs/id/8oKkuTyQYF3jC9a5abCM9C2CLXSzwc7f1hj6hKD2itE3",
