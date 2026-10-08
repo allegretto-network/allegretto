@@ -7,7 +7,9 @@ import { resolvers } from "./resolvers";
 import supergraph from "./supergraph.graphql?raw";
 
 // The gateway is embedded in the worker instead of running as a separate
-// deployment, so REST handlers and /v1/graphql share one unified schema.
+// deployment, so REST handlers resolve the one unified schema through the
+// typed SDK below. There is deliberately no GraphQL HTTP surface; the runtime
+// exists only to serve these handlers.
 // transports must be passed explicitly for workerd: dynamic transport loading
 // does not survive bundling. fetchAPI pins the server to the platform's
 // fetch/Response classes — the whatwg-node ponyfill Response is not valid to

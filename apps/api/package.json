@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vp dev",
     "build": "vp build",
+    "test": "vp test",
     "compose": "mesh-compose -o src/lib/mesh/supergraph.graphql",
     "codegen:mesh": "graphql-codegen --config scripts/mesh.ts",
     "codegen": "vpr compose && vpr codegen:mesh",

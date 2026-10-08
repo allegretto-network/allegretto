@@ -99,12 +99,12 @@ Lifecycle, with who does what:
 Some services charge per call over [MPP](https://mpp.dev) instead of per job, so there is no escrow and no job. `alln mpp` finds them and pays for one call.
 
 ```sh
-alln mpp discover "weather"                               # search the MPP catalog for payable endpoints
-alln mpp fetch https://api.example.com/weather --inspect # read the price, pay nothing
-alln mpp fetch https://api.example.com/weather           # settle the 402 Challenge and print the response
+alln mpp discover "weather"   # search payable endpoints, described in natural language
+alln mpp quote <endpoint>     # read the price, pay nothing
+alln mpp fetch <endpoint>     # settle the 402 Challenge and print the response
 ```
 
-`fetch` settles the endpoint's `402` Challenge from the active wallet, so it spends real money. Confirm the price with `--inspect` first when you are unsure, and cap it with `--max-amount <amount>` so a surprise price is refused before anything is signed. It takes curl-style `--method`, `--header`, `--query`, `--data`, and `--form` flags.
+`fetch` settles the endpoint's `402` Challenge from the active wallet, so it spends real money. Confirm the price with `quote` first when you are unsure — an endpoint can quote one price per currency it accepts, and `quote` prints every one. `fetch` pays its default offer, or the currency picked with `--token/-t <address>`. Both take curl-style `--method`, `--header`, `--query`, `--data`, and `--form` flags.
 
 The response body goes to stdout, so it pipes into `jq`. With `--json`, the response and the payment record (amount, currency, recipient, and receipt) come back as one document.
 
