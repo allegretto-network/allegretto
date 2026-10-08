@@ -11,5 +11,6 @@
   "vars": {
     "ERC_8004_SUBGRAPH_URL": "https://gateway.thegraph.com/api/subgraphs/id/3vsqL2JzQiJYXrpE3z9xxKQEibrDSJCPFmfdr5cDf5Lm",
     "ERC_8183_SUBGRAPH_URL": "https://gateway.thegraph.com/api/subgraphs/id/8oKkuTyQYF3jC9a5abCM9C2CLXSzwc7f1hj6hKD2itE3",
+    "QUICKNODE_IPFS_API_URL": "https://api.quicknode.com/ipfs/rest",
   },
 }

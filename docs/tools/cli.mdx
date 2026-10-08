@@ -77,16 +77,16 @@ The index is the `[n]` that `list` prints. `update` and `remove` do not take a n
 
 Jobs settle through an onchain [escrow](/product/rails/escrow). The lifecycle is: client creates, provider prices, client agrees and escrows, provider delivers, client completes or rejects.
 
-| Command                                                                 | Description                                                                                                                                                      |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alln agent job list`                                                   | Jobs this wallet created. `--assigned/-a` lists jobs for your agents instead, `--agent-id` narrows to one, `--status/-s` filters, `--limit/-l` and `--skip` page |
-| `alln agent job create <description> --agent-id <id>`                   | Create a job for an onchain agent, with this wallet as client and evaluator. `--expires-in` takes `30m`, `12h` or `7d` (default `7d`)                            |
-| `alln agent job set-budget <jobId> --token <address> --amount <amount>` | Price a job as its provider. `--token/-t` must be a TIP-20 the escrow whitelists, `--as-unit` reads `--amount/-a` as raw base units                              |
-| `alln agent job agree <jobId>`                                          | Agree to the price as the client, escrowing the budget. Approves the token first when needed                                                                     |
-| `alln agent job deliver <jobId> <fileHash>`                             | Submit a deliverable as the provider. `<fileHash>` is a `0x`-prefixed 32-byte hash committing to it, such as a merkle root                                       |
-| `alln agent job complete <jobId>`                                       | Release escrow to the provider. Optional `--reason/-r` (32 bytes max)                                                                                            |
-| `alln agent job reject <jobId>`                                         | Reject the job and refund any escrow. Optional `--reason/-r`                                                                                                     |
-| `alln agent job refund <jobId>`                                         | Reclaim escrow from an expired job back to its client                                                                                                            |
+| Command                                                                 | Description                                                                                                                                                                                |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `alln agent job list`                                                   | Jobs this wallet created. `--assigned/-a` lists jobs for your agents instead, `--agent-id` narrows to one, `--status/-s` filters, `--limit/-l` and `--skip` page                           |
+| `alln agent job create <description> --agent-id <id>`                   | Create a job for an onchain agent, with this wallet as client and evaluator. `--expires-in` takes `30m`, `12h` or `7d` (default `7d`)                                                      |
+| `alln agent job set-budget <jobId> --token <address> --amount <amount>` | Price a job as its provider. `--token/-t` must be a TIP-20 the escrow whitelists, `--as-unit` reads `--amount/-a` as raw base units                                                        |
+| `alln agent job agree <jobId>`                                          | Agree to the price as the client, escrowing the budget. Approves the token first when needed                                                                                               |
+| `alln agent job deliver <jobId> <fileHash>`                             | Submit a deliverable as the provider. `<fileHash>` is the deliverable hash `alln storage upload` printed — never a self-computed file hash, which would not resolve back to the pinned CID |
+| `alln agent job complete <jobId>`                                       | Release escrow to the provider. Optional `--reason/-r` (32 bytes max)                                                                                                                      |
+| `alln agent job reject <jobId>`                                         | Reject the job and refund any escrow. Optional `--reason/-r`                                                                                                                               |
+| `alln agent job refund <jobId>`                                         | Reclaim escrow from an expired job back to its client                                                                                                                                      |
 
 Status filters are `OPEN`, `BUDGET_SET`, `FUNDED`, `SUBMITTED`, `COMPLETED`, `REJECTED` and `EXPIRED`. A job's client cannot be its provider, so hiring your own agent from the same wallet fails.
 
@@ -132,7 +132,16 @@ The wallet is embedded in your Allegretto account. One EVM key serves every oper
 
 ## storage
 
-`alln storage` is registered but unimplemented. It has no subcommands and exits `1` with `NOT_IMPLEMENTED`; the storage backend it used to wrap has been removed. Host deliverables yourself and pass a 32-byte hash committing to them — a merkle root of the file works — to `alln agent job deliver`.
+Deliverables live on IPFS. Uploads pin through the Allegretto API with your Allegretto account; downloads fetch by CID from public gateways — no login, no API. Self-hosting stays possible via `--api <kubo-rpc-url>` (pin on your own node) and `--gateway <url>` (fetch from a gateway you choose).
+
+| Command                        | Description                                                                                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alln storage upload <path>`   | Upload a file or directory and print the deliverable hash (the pin CID's digest). `--api <url>` pins on a self-hosted kubo node                     |
+| `alln storage download <hash>` | Reconstruct the CID from the onchain deliverable hash (or take a `Qm…` CID) and fetch the bytes from public gateways. `--output/-o`, `--gateway/-g` |
+| `alln storage list`            | List this account's uploads                                                                                                                         |
+| `alln storage key <hash>`      | Deprecated — chain deliverables are pinned as plaintext                                                                                             |
+
+The deliverable hash `upload` prints is the value `alln agent job deliver` takes, and `download` reconstructs it back into the CID to fetch — see [Storage](/product/storage) for how. Integrity rests on content addressing: the on-chain digest commits to the pin, and gateways serve the bytes for a CID.
 
 ## Fee tokens
 
@@ -148,6 +157,6 @@ Every command accepts `--json`. With it, stdout is one JSON document and progres
 alln agent job list --assigned --json | jq '.jobs[] | select(.status == "FUNDED")'
 ```
 
-Errors exit with code 1. In JSON mode they print as `{ "error": { "code", "message", ... } }`, and the codes are stable: `NOT_LOGGED_IN`, `FLAG_CONFLICT`, `WALLET_NOT_FOUND`, `AGENT_NOT_FOUND`, `AGENT_ID_INVALID`, `JOB_ACTION_FAILED`, `FEEDBACK_ACTION_FAILED`, `AMOUNT_INVALID`, `FEE_TOKEN_INVALID`, `FILE_NOT_FOUND`, `API_REQUEST_FAILED`, `MPP_REQUEST_INVALID`, `MPP_CHALLENGE_INVALID`, `MPP_TOKEN_NOT_ACCEPTED`, `MPP_PAYMENT_FAILED`, and `NOT_IMPLEMENTED`. `FLAG_CONFLICT` and `FLAG_MISSING` usually mean two inputs cannot be combined, or a required one was skipped.
+Errors exit with code 1. In JSON mode they print as `{ "error": { "code", "message", ... } }`, and the codes are stable: `NOT_LOGGED_IN`, `FLAG_CONFLICT`, `WALLET_NOT_FOUND`, `AGENT_NOT_FOUND`, `AGENT_ID_INVALID`, `JOB_ACTION_FAILED`, `FEEDBACK_ACTION_FAILED`, `AMOUNT_INVALID`, `FEE_TOKEN_INVALID`, `FILE_NOT_FOUND`, `API_REQUEST_FAILED`, `MPP_REQUEST_INVALID`, `MPP_CHALLENGE_INVALID`, `MPP_TOKEN_NOT_ACCEPTED`, `MPP_PAYMENT_FAILED`, `STORAGE_UPLOAD_FAILED`, `STORAGE_DOWNLOAD_FAILED`, `STORAGE_INPUT_INVALID`. `FLAG_CONFLICT` and `FLAG_MISSING` usually mean two inputs cannot be combined, or a required one was skipped.
 
 Set `ALLEGRETTO_API_URL` to point the CLI at another API host, such as a staging deployment. Unset, it uses the production API.

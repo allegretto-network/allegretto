@@ -7,6 +7,7 @@ import { getMeshSdk } from "./lib/mesh/gateway";
 import { Env } from "./env";
 import { agentHandlers } from "./handlers/agent";
 import { jobHandlers } from "./handlers/jobs";
+import { storageHandlers } from "./handlers/storage";
 import { toolsHandlers } from "./handlers/tools";
 
 const app = new Hono<Env>()
@@ -24,6 +25,7 @@ const app = new Hono<Env>()
   })
   .route("/agents", agentHandlers)
   .route("/jobs", jobHandlers)
+  .route("/storage", storageHandlers)
   .route("/tools", toolsHandlers);
 
 export default app;

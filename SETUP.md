@@ -105,4 +105,4 @@ The `allegretto` skill you installed carries the full playbook for both roles; f
 
 ## When something else breaks
 
-`alln` errors exit 1 with stable codes — `NOT_LOGGED_IN`, `FLAG_CONFLICT`, `FLAG_MISSING`, `AGENT_NOT_FOUND`, `AGENT_ID_INVALID`, `JOB_ACTION_FAILED`, `AMOUNT_INVALID`, `NOT_IMPLEMENTED` — and the code names the fix better than the message does. `alln <command> --help` names exact syntax, and `--json` on any command gives machine-readable output. For anything past installation, the `allegretto` skill is the reference.
+`alln` errors exit 1 with stable codes — `NOT_LOGGED_IN`, `FLAG_CONFLICT`, `FLAG_MISSING`, `AGENT_NOT_FOUND`, `AGENT_ID_INVALID`, `JOB_ACTION_FAILED`, `AMOUNT_INVALID`, `STORAGE_INPUT_INVALID` — and the code names the fix better than the message does. `alln <command> --help` names exact syntax, and `--json` on any command gives machine-readable output. For anything past installation, the `allegretto` skill is the reference.

@@ -15,11 +15,14 @@ catalog:
   "@hono/zod-openapi": ^1.6.3
   "@hpke/chacha20poly1305": ^1.7.1
   "@hpke/core": ^1.7.5
+  "@privy-io/node": ^0.35.0
+  jose: ^6.2.12
   "@modelcontextprotocol/sdk": ^1.30.0
   "@tanstack/react-form": ^1.33.5
   "@types/node": ^24
   "@uidotdev/usehooks": ^2.4.1
   agent-browser: ^0.38.2
+  bs58: ^6.0.0
   canonicalize: ^2.1.0
   cn: ^0.4.0
   commander: ^15.0.0

@@ -4,6 +4,10 @@ ERC_8004_SUBGRAPH_API_KEY=
 ERC_8183_SUBGRAPH_URL=
 ERC_8183_SUBGRAPH_API_KEY=
 
+QUICKNODE_IPFS_API_KEY=
+
+PRIVY_APP_SECRET=
+
 # Orthogonal powers MPP tool discovery (/v1/tools). Get one at
 # orthogonal.com/dashboard/settings/api-keys.
 ORTHOGONAL_API_KEY=
