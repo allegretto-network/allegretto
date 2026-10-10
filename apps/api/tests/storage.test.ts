@@ -92,7 +92,6 @@ function bindings(quicknodeUrl: string): Bindings {
     ERC_8183_SUBGRAPH_API_KEY: "",
     QUICKNODE_IPFS_API_URL: quicknodeUrl,
     QUICKNODE_IPFS_API_KEY: "test-key",
-    PRIVY_APP_SECRET: "",
     ORTHOGONAL_API_KEY: "",
   };
 }
@@ -147,6 +146,41 @@ test("requests without a token are rejected", async () => {
     bindings("http://127.0.0.1:1"),
   );
   expect(response.status).toBe(401);
+});
+
+test("an oversized declared Content-Length is a 413", async () => {
+  const { token, jwk } = await makeToken();
+
+  await withServer(
+    async (request, response) => {
+      if (request.url === "/jwks") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ keys: [jwk] }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    },
+    async (url) => {
+      setPrivyJwksUrl(`${url.origin}/jwks`);
+      const response = await app.request(
+        "/v1/storage",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Length": String(51 * 1024 * 1024) },
+          body: new Uint8Array(deliverable),
+        },
+        bindings(url.origin),
+      );
+      setPrivyJwksUrl(null);
+
+      expect(response.status).toBe(413);
+      await expect(response.json()).resolves.toMatchObject({
+        title: "Payload too large",
+        type: "Storage",
+      });
+    },
+  );
 });
 
 test("an invalid token is rejected", async () => {

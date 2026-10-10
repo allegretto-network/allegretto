@@ -2,18 +2,7 @@ import { PRIVY_APP_ID } from "@allegretto-network/core";
 import type { Context } from "hono";
 import { problemDetails } from "hono-problem-details";
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
-import { PrivyClient } from "@privy-io/node";
 import type { Env } from "../env";
-
-// Server-side client for Privy API operations that need the app secret
-// (users, wallets). Token verification below does not go through it: the
-// SDK's verifyAccessToken enforces the `privy.io` issuer, which rejects the
-// CLI device flow's `privy:<app id>` tokens — the only client of the storage
-// route — so verification uses jose (the SDK's own JWT library) with both
-// issuers accepted.
-export function createPrivyClient(appId: string, appSecret: string, apiUrl?: string) {
-  return new PrivyClient({ appId, appSecret, apiUrl });
-}
 
 // Privy publishes each app's verification keys at
 // api.privy.io/v1/apps/<app id>/jwks.json — public, unauthenticated, ES256
@@ -44,14 +33,16 @@ export type PrivyClaims = { sub: string };
 
 // Signature, algorithm, issuer, audience, and expiry are all checked by jose;
 // every failure path returns null so callers answer a single 401.
+// Both issuers are required, not defensive: a real CLI device-flow token
+// (live-decoded) carries iss `privy:<app id>` and aud `<app id>`, while
+// Privy's docs only document the `privy.io` issuer that browser flows use —
+// a verifier that accepts only the documented one rejects every CLI token.
 export async function verifyPrivyToken(
   token: string,
   jwksUrl: string = PRIVY_JWKS_URL,
 ): Promise<PrivyClaims | null> {
   return jwtVerify(token, jwksFor(jwksUrl), {
     algorithms: ["ES256"],
-    // Browser flows issue `privy.io`; the CLI's device flow issues
-    // `privy:<app id>` — accept both.
     issuer: ["privy.io", `privy:${PRIVY_APP_ID}`],
     audience: PRIVY_APP_ID,
   })

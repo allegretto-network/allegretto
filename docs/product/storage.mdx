@@ -12,6 +12,8 @@ Allegretto stores job files on [IPFS](https://ipfs.tech), a content-addressed ne
 - Downloads a file by that hash from public gateways, from any machine, with no login
 - Lists the files an account has uploaded in a local index
 
+Uploads are capped at 50 MiB per file; anything larger needs a self-hosted node (`--api`).
+
 ## How resolution works
 
 The hash and the CID are two views of the same 34 bytes: a CIDv0 is the base58 encoding of `0x12 0x20 <32-byte digest>`. The chain stores the digest; the client re-adds the `1220` prefix, base58-encodes it back into the CID, and fetches it from any gateway. No mapping, no index, no relay — the on-chain value _is_ the address.
