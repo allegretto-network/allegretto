@@ -4,6 +4,7 @@ import {
   cidFromDeliverableHash,
   deliverableHashFromCid,
   deliverableHashSchema,
+  MAX_UPLOAD_BYTES,
   parseDeliverableHash,
 } from "@allegretto-network/core";
 import pc from "picocolors";
@@ -135,6 +136,15 @@ async function uploadPath(
 // the gateway serves bytes by CID, public and content-addressed.
 async function pinStored(name: string, stored: Buffer, api: string | undefined): Promise<string> {
   if (api !== undefined) return uploadBytes(name, stored, api);
+
+  // The API caps uploads; failing here avoids reading and POSTing a file
+  // that can only come back 413. Self-hosted kubo has no such cap.
+  if (stored.length > MAX_UPLOAD_BYTES)
+    throw new CliError(
+      "STORAGE_INPUT_INVALID",
+      `${name} is over the ${MAX_UPLOAD_BYTES / 1024 / 1024} MiB API upload limit.`,
+      "Pin it on a self-hosted node with --api <kubo-rpc-url> instead.",
+    );
 
   return uploadDeliverable(stored, await requireAccessToken());
 }

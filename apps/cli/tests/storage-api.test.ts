@@ -47,6 +47,25 @@ test("uploadDeliverable requires a token", async () => {
   );
 });
 
+test("a 413 maps to an over-the-limit hint pointing at --api", async () => {
+  await withServer(
+    (_request, response) => {
+      response.writeHead(413, { "content-type": "application/json" });
+      response.end(JSON.stringify({ title: "Payload too large", type: "Storage" }));
+    },
+    async (url) => {
+      const error = await uploadDeliverable(Buffer.from("x"), "token", url.origin).catch(
+        (error: Error) => error,
+      );
+
+      expect(error).toBeInstanceOf(CliError);
+      expect((error as CliError).message).toContain("HTTP 413");
+      expect((error as CliError).recovery).toContain("--api <kubo-rpc-url>");
+      expect((error as CliError).recovery).toContain("MiB");
+    },
+  );
+});
+
 test("downloadBytes returns the first gateway that answers ok", async () => {
   await withServer(
     (request, response) => {

@@ -32,6 +32,12 @@ export function parseDeliverableHash(value: string): `0x${string}` | null {
 // CIDv0 is the base58btc encoding of the bare multihash 0x1220 <digest>.
 const MULTIHASH_PREFIX = "1220";
 
+// The Allegretto API's per-file upload cap: every pin bills the shared
+// QuickNode account, so oversized bodies are rejected with 413. Self-hosted
+// kubo uploads (--api) are uncapped. Shared here so the CLI's local precheck
+// and its error hints can never drift from what the API enforces.
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
 /** Reconstructs the CIDv0 string (Qm…) from an onchain deliverable digest. */
 export function cidFromDeliverableHash(hash: `0x${string}`): string {
   const digest = hash.startsWith("0x") ? hash.slice(2) : hash;

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
+import { MAX_UPLOAD_BYTES } from "@allegretto-network/core";
 import { API_URL } from "./api.ts";
 import { CliError } from "../utils/errors.ts";
 
@@ -137,7 +138,9 @@ export async function uploadDeliverable(
       `The Allegretto API rejected the upload${response ? `: HTTP ${response.status}` : "."}`,
       response?.status === 401
         ? "Run `alln auth login` and try again."
-        : "Check your connection, then retry.",
+        : response?.status === 413
+          ? `The file is over the ${MAX_UPLOAD_BYTES / 1024 / 1024} MiB API upload limit; pin it on a self-hosted node with --api <kubo-rpc-url> instead.`
+          : "Check your connection, then retry.",
     );
 
   const result = await response
