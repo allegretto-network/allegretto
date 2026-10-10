@@ -588,7 +588,9 @@ const deliver = zodCommand({
   description: "Submit a deliverable for a funded job as its provider",
   args: {
     jobId: z.string().describe("Onchain job id"),
-    fileHash: z.string().describe("32-byte content hash committing to the deliverable"),
+    fileHash: z
+      .string()
+      .describe("Deliverable hash printed by `alln storage upload` (the pin CID's digest)"),
   },
   opts: {
     "fee-token": feeTokenSchema,
@@ -632,7 +634,7 @@ async function deliverJob(
     throw new CliError(
       "JOB_INPUT_INVALID",
       `${fileHash} is not a 32-byte hash.`,
-      "Pass the 32-byte content hash of the deliverable, e.g. its merkle root.",
+      "Pass the deliverable hash `alln storage upload` printed — never a self-computed file hash, which would not resolve back to the pinned CID.",
     );
 
   progress(json, `Submitting deliverable for job #${jobId}…`);

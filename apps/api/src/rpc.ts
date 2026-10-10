@@ -20,6 +20,7 @@ export {
   listJobsOutputSchema,
   listJobsQuerySchema,
 } from "./schemas/jobs";
+export { uploadStorageOutputSchema } from "./schemas/storage";
 // Tool discovery schemas live in core (the provider-agnostic MPP interface);
 // the /v1/tools route serves them, so consumers get them from here like the rest.
 export {

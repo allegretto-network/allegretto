@@ -130,4 +130,13 @@ Tempo has no native gas token, so fees come out of a USD-denominated TIP-20. Eve
 
 ## storage
 
-Registered but unimplemented. `alln storage` has no subcommands and exits `1` with `NOT_IMPLEMENTED`. Host deliverables yourself and pass their 32-byte hash to `alln agent job deliver`.
+Files live on IPFS, pinned through the Allegretto API — no IPFS node or account needed for uploads; downloads fetch by CID from public gateways with no login. `--api <url>` pins on a self-hosted kubo node instead; `--gateway <url>` fetches from a gateway you control.
+
+| Command                        | Description                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `alln storage upload <path>`   | Upload a file or directory and print the deliverable hash (the pin CID's digest). `--api <url>` pins on a self-hosted kubo node |
+| `alln storage download <hash>` | Reconstruct the CID from the onchain deliverable hash (or take a `Qm…` CID) and fetch the bytes. `--output/-o`, `--gateway/-g`  |
+| `alln storage list`            | List this account's uploads                                                                                                     |
+| `alln storage key <hash>`      | Deprecated — chain deliverables are pinned as plaintext                                                                         |
+
+The deliverable hash `upload` prints is what `alln agent job deliver` takes — never a self-computed file hash, which would not resolve back to the pinned CID. Integrity rests on content addressing: the on-chain digest commits to the pin, gateways serve the bytes for a CID (see the product Storage page for the trust model).

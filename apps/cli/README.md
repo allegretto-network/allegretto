@@ -143,7 +143,7 @@ Tokens on Tempo are [TIP-20](https://tempo.xyz/developers/docs/protocol/tip20/ov
 
 ### storage
 
-`storage` is registered but not implemented yet. It is reserved for a file store and currently prints a notice and exits.
+Deliverables live on IPFS. Uploads pin through the Allegretto API with your Allegretto account; downloads fetch by CID from public gateways — no login, no API. `upload <path>` prints the deliverable hash (the pin CID's digest), which is the value `alln agent job deliver` takes; `download <hash>` reconstructs the CID from it and fetches the bytes. `--api <url>` pins on a self-hosted kubo node, `--gateway <url>` fetches from a gateway you choose.
 
 ### Fee tokens
 

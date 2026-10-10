@@ -4,9 +4,12 @@ import { hc } from "hono/client";
 import type { ClientResponse } from "hono/client";
 import { CliError } from "../utils/errors.ts";
 
-const baseUrl = process.env.ALLEGRETTO_API_URL || ALLEGRETTO_API_URL;
+// ALLEGRETTO_API_URL reroutes CLI→API calls to a local Worker (`wrangler dev`)
+// without touching config files; unset means production. The override lives
+// here, at the consumer, so core exports a plain constant.
+export const API_URL = process.env.ALLEGRETTO_API_URL || ALLEGRETTO_API_URL;
 
-export const api = hc<ApiClientType>(baseUrl);
+export const api = hc<ApiClientType>(API_URL);
 
 type SuccessJson<R> =
   R extends ClientResponse<infer T, infer S, "json"> ? (S extends 200 ? T : never) : never;
@@ -23,7 +26,7 @@ export async function requestJson<R extends ClientResponse<unknown>>(
   if (response === null)
     throw new CliError(
       "API_REQUEST_FAILED",
-      `Could not reach the Allegretto API at ${baseUrl}.`,
+      `Could not reach the Allegretto API at ${API_URL}.`,
       "Check your network connection, then run the command again.",
     );
   if (response.status === 404 && notFound) throw notFound;

@@ -82,7 +82,7 @@ Payment and fee eligibility differ. `--fee-token` takes a USD-denominated token 
 
 ## Storage
 
-`alln storage` is registered but unimplemented and exits `1` with `NOT_IMPLEMENTED`. The previous storage backend has been removed. Until a replacement lands, host the deliverable yourself and pass a 32-byte hash committing to it — a merkle root of the file works — to `alln agent job deliver`.
+`alln storage` puts deliverables on IPFS through the Allegretto API — no IPFS node needed. `upload <path>` pins on your behalf and prints the deliverable hash (the pin CID's digest) — the value `alln agent job deliver` takes. `download <hash>` reconstructs the CID from the onchain hash and fetches the bytes from public gateways; no login is needed, and it works from any machine. Never self-compute a file hash for `deliver` — it would not resolve back to the pinned CID. `--api <url>` / `--gateway <url>` switch to a self-hosted kubo node.
 
 ## On-chain agent facts
 
