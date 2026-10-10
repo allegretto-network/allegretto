@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import type { Stats } from "node:fs";
 import path from "node:path";
 import {
   cidFromDeliverableHash,
@@ -97,6 +98,12 @@ async function uploadPath(
     const name = path.relative(root, filePath);
     progress(json, `Uploading ${name}…`);
 
+    // Stat before reading so an over-limit file fails without ever being
+    // buffered — a multi-GB path would otherwise OOM the CLI to learn the
+    // same thing the API would reject with 413. --api (kubo) is uncapped.
+    if (opts.api === undefined)
+      assertUnderUploadLimit(name, await fs.stat(filePath).catch(() => null));
+
     const bytes = await fs.readFile(filePath).catch(() => {
       throw new CliError("STORAGE_PATH_NOT_FOUND", `Could not read ${filePath}.`);
     });
@@ -137,16 +144,19 @@ async function uploadPath(
 async function pinStored(name: string, stored: Buffer, api: string | undefined): Promise<string> {
   if (api !== undefined) return uploadBytes(name, stored, api);
 
-  // The API caps uploads; failing here avoids reading and POSTing a file
-  // that can only come back 413. Self-hosted kubo has no such cap.
-  if (stored.length > MAX_UPLOAD_BYTES)
-    throw new CliError(
-      "STORAGE_INPUT_INVALID",
-      `${name} is over the ${MAX_UPLOAD_BYTES / 1024 / 1024} MiB API upload limit.`,
-      "Pin it on a self-hosted node with --api <kubo-rpc-url> instead.",
-    );
-
   return uploadDeliverable(stored, await requireAccessToken());
+}
+
+// The API caps uploads; failing before the read keeps a too-large file out of
+// memory and off the wire. Self-hosted kubo has no such cap.
+function assertUnderUploadLimit(name: string, stats: Stats | null) {
+  if (stats === null || stats.size <= MAX_UPLOAD_BYTES) return;
+
+  throw new CliError(
+    "STORAGE_INPUT_INVALID",
+    `${name} is over the ${MAX_UPLOAD_BYTES / 1024 / 1024} MiB API upload limit.`,
+    "Pin it on a self-hosted node with --api <kubo-rpc-url> instead.",
+  );
 }
 
 async function collectFiles(inputPath: string): Promise<string[]> {
